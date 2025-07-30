@@ -5,6 +5,9 @@ import {
 	PluginSettingTab,
 	Setting,
 	WorkspaceLeaf,
+	Modal,
+	TextComponent,
+	TextAreaComponent,
 } from "obsidian";
 import { CuratorView, VIEW_TYPE_CURATOR } from "./CuratorView";
 
@@ -148,6 +151,80 @@ export default class KnowledgeCurator extends Plugin {
 	}
 }
 
+class TemplateModal extends Modal {
+	template: PromptTemplate;
+	onSave: (template: PromptTemplate) => void;
+
+	constructor(
+		app: App,
+		template: PromptTemplate | null,
+		onSave: (template: PromptTemplate) => void
+	) {
+		super(app);
+		this.onSave = onSave;
+		this.template = template || { name: "", prompt: "" };
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.createEl("h2", {
+			text: this.template.name ? "Edit Template" : "Add New Template",
+		});
+
+		let nameInput: TextComponent;
+		let promptInput: TextAreaComponent;
+
+		new Setting(contentEl)
+			.setName("Template Name")
+			.setDesc("A unique name for your prompt template.")
+			.addText((text) => {
+				nameInput = text;
+				nameInput.setValue(this.template.name).onChange((value) => {
+					this.template.name = value;
+				});
+			});
+
+		new Setting(contentEl)
+			.setName("Prompt")
+			.setDesc(
+				"The prompt text. Use {{title}} as a placeholder for the link name."
+			)
+			.addTextArea((text) => {
+				promptInput = text;
+				promptInput.setValue(this.template.prompt).onChange((value) => {
+					this.template.prompt = value;
+				});
+			});
+
+		const buttonContainer = contentEl.createDiv(
+			"curator-modal-button-container"
+		);
+		new Setting(buttonContainer).addButton((btn) => {
+			btn.setButtonText("Save")
+				.setCta()
+				.onClick(() => {
+					if (!this.template.name || !this.template.prompt) {
+						new Notice("Name and Prompt cannot be empty.");
+						return;
+					}
+					this.onSave(this.template);
+					this.close();
+				});
+		});
+
+		new Setting(buttonContainer).addButton((btn) => {
+			btn.setButtonText("Cancel").onClick(() => {
+				this.close();
+			});
+		});
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
 class KnowledgeCuratorSettingTab extends PluginSettingTab {
 	plugin: KnowledgeCurator;
 
@@ -229,24 +306,18 @@ class KnowledgeCuratorSettingTab extends PluginSettingTab {
 						.setIcon("pencil")
 						.setTooltip("Edit")
 						.onClick(() => {
-							// Simple prompt for edit
-							const newName = prompt(
-								"Edit template name:",
-								template.name
+							const modal = new TemplateModal(
+								this.app,
+								{ ...template },
+								(updatedTemplate) => {
+									this.plugin.settings.promptTemplates[
+										index
+									] = updatedTemplate;
+									this.plugin.saveSettings();
+									renderTemplates();
+								}
 							);
-							if (newName === null) return; // User cancelled
-							const newPrompt = prompt(
-								"Edit template prompt:",
-								template.prompt
-							);
-							if (newPrompt === null) return; // User cancelled
-
-							this.plugin.settings.promptTemplates[index] = {
-								name: newName,
-								prompt: newPrompt,
-							};
-							this.plugin.saveSettings();
-							renderTemplates(); // Re-render
+							modal.open();
 						});
 				});
 
@@ -255,6 +326,9 @@ class KnowledgeCuratorSettingTab extends PluginSettingTab {
 						.setIcon("trash")
 						.setTooltip("Delete")
 						.onClick(() => {
+							// For deletion, a simple confirm is usually enough,
+							// but we can create a custom modal if preferred.
+							// For now, let's stick to confirm for deletion.
 							if (
 								confirm(
 									`Are you sure you want to delete the template "${template.name}"?`
@@ -279,21 +353,18 @@ class KnowledgeCuratorSettingTab extends PluginSettingTab {
 				btn.setButtonText("Add")
 					.setCta()
 					.onClick(() => {
-						const name = window.prompt(
-							"Enter a name for the new template:"
+						const modal = new TemplateModal(
+							this.app,
+							null,
+							(newTemplate) => {
+								this.plugin.settings.promptTemplates.push(
+									newTemplate
+								);
+								this.plugin.saveSettings();
+								renderTemplates();
+							}
 						);
-						if (!name) return;
-						const promptText = window.prompt(
-							"Enter the prompt for the new template (use {{title}} as a placeholder):"
-						);
-						if (!promptText) return;
-
-						this.plugin.settings.promptTemplates.push({
-							name,
-							prompt: promptText,
-						});
-						this.plugin.saveSettings();
-						renderTemplates();
+						modal.open();
 					});
 			});
 

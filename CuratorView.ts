@@ -434,33 +434,35 @@ export class CuratorView extends ItemView {
 		) as HTMLElement;
 		if (!folderHeader || !folderContent) return;
 
-		if (this.state.expandedFolders.has(folderId)) {
-			this.state.expandedFolders.delete(folderId);
-			folderContent.style.maxHeight = "0px";
-			setTimeout(() => {
-				// Wait for transition to finish
-				folderContent.style.display = "none";
-			}, 300); // Match transition duration
-		} else {
-			this.state.expandedFolders.add(folderId);
-			folderContent.style.display = "block";
-			// Force reflow to ensure transition applies
-			folderContent.style.maxHeight = `0px`;
-			setTimeout(() => {
-				folderContent.style.maxHeight = `${folderContent.scrollHeight}px`;
-			}, 10);
-		}
-		// Update icon
+		const isExpanded = this.state.expandedFolders.has(folderId);
 		const icon = folderHeader.querySelector(
 			".curator-folder-icon"
 		) as HTMLElement;
-		if (icon)
-			setIcon(
-				icon,
-				this.state.expandedFolders.has(folderId)
-					? "chevron-down"
-					: "chevron-right"
-			);
+
+		if (isExpanded) {
+			this.state.expandedFolders.delete(folderId);
+			folderContent.style.maxHeight = "0px";
+			requestAnimationFrame(() => {
+				// Use a timeout that matches the CSS transition duration
+				setTimeout(() => {
+					folderContent.style.display = "none";
+				}, 300); // Match transition duration
+			});
+		} else {
+			this.state.expandedFolders.add(folderId);
+			folderContent.style.display = "block";
+			folderContent.style.maxHeight = "0px"; // Start from 0 for transition
+			requestAnimationFrame(() => {
+				// Measure scrollHeight in the next frame
+				requestAnimationFrame(() => {
+					folderContent.style.maxHeight = `${folderContent.scrollHeight}px`;
+				});
+			});
+		}
+
+		if (icon) {
+			setIcon(icon, isExpanded ? "chevron-right" : "chevron-down");
+		}
 	}
 
 	toggleLinkDetails(linkText: string, linkItemElement: HTMLElement) {
@@ -472,35 +474,64 @@ export class CuratorView extends ItemView {
 		) as HTMLElement;
 		if (!detailsContainer || !expandIcon) return;
 
-		if (this.state.expandedLinks.has(linkText)) {
+		const isExpanded = this.state.expandedLinks.has(linkText);
+
+		if (isExpanded) {
 			this.state.expandedLinks.delete(linkText);
 			detailsContainer.style.maxHeight = "0px";
-			setTimeout(() => {
-				detailsContainer.style.display = "none";
-			}, 300);
+			requestAnimationFrame(() => {
+				setTimeout(() => {
+					detailsContainer.style.display = "none";
+				}, 300);
+			});
 		} else {
 			this.state.expandedLinks.add(linkText);
 			detailsContainer.style.display = "block";
-			detailsContainer.style.maxHeight = `0px`;
-			setTimeout(() => {
-				detailsContainer.style.maxHeight = `${detailsContainer.scrollHeight}px`;
-			}, 10);
+			detailsContainer.style.maxHeight = "0px";
+			requestAnimationFrame(() => {
+				requestAnimationFrame(() => {
+					detailsContainer.style.maxHeight = `${detailsContainer.scrollHeight}px`;
+				});
+			});
 		}
-		setIcon(
-			expandIcon,
-			this.state.expandedLinks.has(linkText)
-				? "chevron-down"
-				: "chevron-right"
-		);
+
+		setIcon(expandIcon, isExpanded ? "chevron-right" : "chevron-down");
 	}
 
 	toggleLinkSelection(linkText: string) {
-		if (this.state.selectedLinks.has(linkText)) {
+		const isSelected = this.state.selectedLinks.has(linkText);
+		if (isSelected) {
 			this.state.selectedLinks.delete(linkText);
 		} else {
 			this.state.selectedLinks.add(linkText);
 		}
-		this.renderLinks(); // Re-render to update checkbox and generate button state
+
+		// Find the link item in the DOM and update its visual state
+		const linkId = `link-${linkText.replace(/\s/g, "-")}`;
+		const linkItem = this.containerEl.querySelector(
+			`[data-link-id="${linkId}"]`
+		) as HTMLElement;
+		if (linkItem) {
+			const checkbox = linkItem.querySelector(
+				".curator-link-checkbox"
+			) as HTMLInputElement;
+			if (checkbox) {
+				checkbox.checked = !isSelected;
+			}
+			if (isSelected) {
+				linkItem.removeClass("is-selected");
+			} else {
+				linkItem.addClass("is-selected");
+			}
+		}
+
+		// Update the generate button state without re-rendering everything
+		const generateButton = this.containerEl.querySelector(
+			".curator-generate-button"
+		) as HTMLButtonElement;
+		if (generateButton) {
+			this.updateGenerateButtonState(generateButton);
+		}
 	}
 
 	updateGenerateButtonState(button: HTMLButtonElement) {
@@ -542,12 +573,57 @@ export class CuratorView extends ItemView {
 		visibleLinkTexts.forEach((linkText) => {
 			this.state.selectedLinks.add(linkText);
 		});
-		this.renderLinks(); // Re-render to update checkboxes and button state
+
+		// Update DOM directly
+		visibleLinkTexts.forEach((linkText) => {
+			const linkId = `link-${linkText.replace(/\s/g, "-")}`;
+			const linkItem = this.containerEl.querySelector(
+				`[data-link-id="${linkId}"]`
+			) as HTMLElement;
+			if (linkItem) {
+				const checkbox = linkItem.querySelector(
+					".curator-link-checkbox"
+				) as HTMLInputElement;
+				if (checkbox) {
+					checkbox.checked = true;
+				}
+				linkItem.addClass("is-selected");
+			}
+		});
+
+		// Update the generate button state
+		const generateButton = this.containerEl.querySelector(
+			".curator-generate-button"
+		) as HTMLButtonElement;
+		if (generateButton) {
+			this.updateGenerateButtonState(generateButton);
+		}
 	}
 
 	deselectAllLinks() {
 		this.state.selectedLinks.clear();
-		this.renderLinks(); // Re-render to update checkboxes and button state
+
+		// Update DOM directly
+		const allSelectedLinkItems = this.containerEl.querySelectorAll(
+			".curator-link-item.is-selected"
+		) as NodeListOf<HTMLElement>;
+		allSelectedLinkItems.forEach((linkItem) => {
+			const checkbox = linkItem.querySelector(
+				".curator-link-checkbox"
+			) as HTMLInputElement;
+			if (checkbox) {
+				checkbox.checked = false;
+			}
+			linkItem.removeClass("is-selected");
+		});
+
+		// Update the generate button state
+		const generateButton = this.containerEl.querySelector(
+			".curator-generate-button"
+		) as HTMLButtonElement;
+		if (generateButton) {
+			this.updateGenerateButtonState(generateButton);
+		}
 	}
 
 	async handleGenerateSelected() {
