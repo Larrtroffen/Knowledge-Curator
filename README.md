@@ -84,6 +84,7 @@
 
 ## 技术架构 (Technical Architecture)
 
+<<<<<<< HEAD
 ```mermaid
 graph TD
     subgraph Obsidian Plugin: Knowledge Curator
@@ -117,6 +118,14 @@ graph TD
 -   **`GeneratorService.ts`:** 需要增加一个 `getContextSnippets(linkText)` 方法。这个方法会反向查找所有引用了 `linkText` 的文件，并从这些文件中提取相关段落。
 -   **`CuratorView.ts`:** 负责渲染新的链接列表 UI，处理排序、分组、搜索等用户交互，并调用 `GeneratorService` 来完成“一键定义”的流程。
 -   **其他模块 (`main.ts`, `ApiService.ts`, `Settings.ts`)** 的职责与之前类似，但处理的数据从“文件状态”变为了“悬空链接列表”。
+=======
+-   **`main.ts`**: 插件的入口点。负责注册侧边栏视图、命令（如打开视图、刷新扫描）和设置页面。是插件生命周期管理的核心。
+-   **`CuratorView.ts`**: 侧边栏 UI 的核心。负责渲染笔记列表、处理用户点击事件、调用内容生成服务，并更新笔记文件和其 Frontmatter。它直接与用户交互。
+-   **`VaultScanner.ts`**: 负责遍历 Vault，通过 `app.metadataCache` 读取每个 Markdown 文件的 Frontmatter，判断其状态（待填充、已完成等），并构建一个供 UI 渲染的数据结构。
+-   **`GeneratorService.ts`**: 内容生成的核心协调器。它接收笔记标题，读取用户指定的模板文件，将标题注入模板形成最终的 Prompt，然后调用 `ApiService`。
+-   **`ApiService.ts`**: 专门的网络通信模块。负责与 OpenAI 兼容的 API 端点进行通信。它构造请求头（包括 `Authorization`）和请求体，处理网络请求和可能发生的错误，并返回 AI 生成的原始文本内容。
+-   **设置 (`KnowledgeCuratorSettings`)**: 在 `main.ts` 中定义，包含了所有用户可配置的选项，如 API 信息、模板路径、状态标识符等。设置数据通过 Obsidian 的 API 进行加载和保存。
+>>>>>>> e4aae2ddac624958562969055b3ff5cc1bafd7b5
 
 ## 开发与构建
 
