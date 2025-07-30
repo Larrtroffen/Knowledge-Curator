@@ -4,8 +4,6 @@
 [![License](https://img.shields.io/github/license/Larrtroffen/Knowledge-Curator?style=flat-square)](https://github.com/Larrtroffen/Knowledge-Curator/blob/main/LICENSE)
 [![Obsidian Plugin](https://img.shields.io/badge/Obsidian-Plugin-black?style=flat-square&logo=obsidian&logoColor=white)](https://obsidian.md/)
 
-**中文说明 (Chinese Introduction)** | [README.zh.md](README.zh.md)
-
 ---
 
 **Knowledge Curator** is an Obsidian plugin that acts as a **link-driven knowledge graph extender**. It scans your vault for all `[[wikilinks]]`, identifies "unresolved links" (links that point to non-existent files), and presents them in an intelligently sorted list. With a single click, you can create the corresponding file and use AI to populate it with content, helping you organically grow your knowledge network.
@@ -22,6 +20,10 @@
 -   **🔍 Search & Filter**: Quickly find specific unresolved links using the built-in search bar.
 -   **⚙️ Highly Configurable**: Easily configure your AI API endpoint, model, and other generation preferences.
 -   **🎨 Polished UI/UX**: Enjoy smooth animations and a responsive interface with non-intrusive modals for a better user experience.
+
+<img width="611" height="925" alt="image" src="https://github.com/user-attachments/assets/ace9b747-146a-45dd-ab40-e7ec3545876f" />
+
+<img width="1125" height="1139" alt="d25e2f32-f157-4aec-bba7-5fbfc491d3c9" src="https://github.com/user-attachments/assets/c6fd7aed-6ed3-4284-8908-253ac672adec" />
 
 ## 🚀 Getting Started
 
