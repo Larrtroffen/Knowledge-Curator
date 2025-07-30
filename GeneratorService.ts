@@ -1,4 +1,4 @@
-import { App, TFile, Notice } from "obsidian";
+import { App, TFile, TFolder } from "obsidian";
 import KnowledgeCurator from "./main";
 import { ApiService } from "./ApiService";
 
@@ -62,29 +62,64 @@ export class GeneratorService {
 	}
 
 	/**
-	 * Generates content for a new note based on a title and optional context snippets.
+	 * Gets a list of available template files from the configured template folder.
+	 * @returns A promise that resolves to an array of objects, each containing the template's name and path.
+	 */
+	async getAvailableTemplates(): Promise<{ name: string; path: string }[]> {
+		const { templateFolderPath } = this.plugin.settings;
+		const templates: { name: string; path: string }[] = [];
+
+		if (!templateFolderPath) {
+			return []; // Return empty if no folder is configured
+		}
+
+		const folder = this.app.vault.getAbstractFileByPath(templateFolderPath);
+		if (!(folder instanceof TFolder)) {
+			// If it's not a folder or doesn't exist, return empty.
+			// Optionally, show a notice or log a warning.
+			console.warn(
+				`Template folder not found or is not a folder: ${templateFolderPath}`
+			);
+			return [];
+		}
+
+		const children = folder.children;
+		for (const child of children) {
+			if (child instanceof TFile && child.extension === "md") {
+				templates.push({
+					name: child.basename,
+					path: child.path,
+				});
+			}
+		}
+		// Sort templates alphabetically by name
+		templates.sort((a, b) => a.name.localeCompare(b.name));
+		return templates;
+	}
+
+	/**
+	 * Generates content for a new note based on a title, optional context snippets, and a selected template path.
 	 * @param title The title of the new note.
 	 * @param contextSnippets Optional string containing context snippets.
+	 * @param templatePath The path to the selected template file.
 	 * @returns A promise that resolves to the generated content string.
 	 */
 	async generateForNoteTitle(
 		title: string,
-		contextSnippets?: string
+		contextSnippets: string | undefined,
+		templatePath: string
 	): Promise<string> {
-		const { templateFilePath } = this.plugin.settings;
-
-		if (!templateFilePath) {
+		if (!templatePath) {
 			throw new Error(
-				"Template file path is not configured. Please check the plugin settings."
+				"Template path is not provided. Please select a template."
 			);
 		}
 
-		const templateFile =
-			this.app.vault.getAbstractFileByPath(templateFilePath);
+		const templateFile = this.app.vault.getAbstractFileByPath(templatePath);
 
 		if (!(templateFile instanceof TFile)) {
 			throw new Error(
-				`Template file not found at "${templateFilePath}". Please check the path in settings.`
+				`Template file not found at "${templatePath}". Please check the template selection.`
 			);
 		}
 
@@ -93,9 +128,7 @@ export class GeneratorService {
 			templateContent = await this.app.vault.read(templateFile);
 		} catch (error) {
 			console.error("Error reading template file:", error);
-			throw new Error(
-				`Could not read template file: ${templateFilePath}`
-			);
+			throw new Error(`Could not read template file: ${templatePath}`);
 		}
 
 		// Replace placeholders
@@ -109,24 +142,23 @@ export class GeneratorService {
 		}
 
 		try {
-			new Notice(`Generating content for "${title}"...`);
+			// Notice will be handled by the caller (CuratorView) for batch operations
 			const generatedContent = await this.apiService.generateContent(
 				prompt
 			);
-			new Notice(`Content generated for "${title}".`);
 			return generatedContent;
 		} catch (error) {
 			console.error("Error during content generation:", error);
 			if (error instanceof Error) {
-				new Notice(
+				// Notice will be handled by the caller
+				throw new Error(
 					`Failed to generate content for "${title}": ${error.message}`
 				);
 			} else {
-				new Notice(
+				throw new Error(
 					`An unknown error occurred while generating content for "${title}".`
 				);
 			}
-			throw error;
 		}
 	}
 }

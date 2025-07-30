@@ -1,9 +1,16 @@
-import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
+import { ItemView, WorkspaceLeaf, Notice, setIcon } from "obsidian";
 import KnowledgeCurator from "./main";
 import { VaultScanner, UnresolvedLinkInfo } from "./VaultScanner";
 import { GeneratorService } from "./GeneratorService";
+import { t } from "./i18n";
 
 export const VIEW_TYPE_CURATOR = "knowledge-curator-view";
+
+interface LinkViewState {
+	expandedFolders: Set<string>;
+	expandedLinks: Set<string>;
+	selectedLinks: Set<string>;
+}
 
 export class CuratorView extends ItemView {
 	plugin: KnowledgeCurator;
@@ -11,9 +18,16 @@ export class CuratorView extends ItemView {
 	generator: GeneratorService;
 	contentEl: HTMLElement; // Main content area for the list
 	links: UnresolvedLinkInfo[] = [];
+	availableTemplates: { name: string; path: string }[] = [];
+	selectedTemplatePath = "";
 	currentSortBy: "frequency" | "alphabetical" = "frequency";
-	currentGroupBy: "none" | "folder" = "none";
+	currentGroupBy: "none" | "folder" = "folder"; // Default to folder view
 	searchQuery = "";
+	state: LinkViewState = {
+		expandedFolders: new Set(),
+		expandedLinks: new Set(),
+		selectedLinks: new Set(),
+	};
 
 	constructor(leaf: WorkspaceLeaf, plugin: KnowledgeCurator) {
 		super(leaf);
@@ -27,35 +41,113 @@ export class CuratorView extends ItemView {
 	}
 
 	getDisplayText() {
-		return "Knowledge Curator";
+		return t(this.plugin.settings.language, "viewTitle");
 	}
 
 	getIcon() {
-		return "links-coming-in"; // A more fitting icon for a link-focused view
+		return "links-coming-in";
 	}
 
 	async onOpen() {
+		await this.loadView();
+		await this.loadTemplates();
+	}
+
+	async loadTemplates() {
+		try {
+			this.availableTemplates =
+				await this.generator.getAvailableTemplates();
+			if (this.availableTemplates.length > 0) {
+				this.selectedTemplatePath = this.availableTemplates[0].path; // Select first by default
+			}
+			this.renderTemplateDropdown();
+		} catch (error) {
+			console.error("Failed to load templates:", error);
+			new Notice(
+				t(this.plugin.settings.language, "noticeCouldNotLoadTemplates")
+			);
+		}
+	}
+
+	renderTemplateDropdown() {
+		const existingDropdown = this.containerEl.querySelector(
+			".curator-template-select"
+		);
+		if (existingDropdown) {
+			existingDropdown.remove();
+		}
+
+		const toolbar = this.containerEl.querySelector(".curator-toolbar");
+		if (!toolbar) return;
+
+		const templateLabel = toolbar.createEl("label", {
+			cls: "curator-toolbar-label",
+			text: ` ${t(this.plugin.settings.language, "templateLabel")} `,
+		});
+		const templateDropdown = toolbar.createEl("select", {
+			cls: "curator-template-select",
+		});
+
+		if (this.availableTemplates.length === 0) {
+			templateDropdown.appendChild(new Option("No templates found", ""));
+			templateDropdown.disabled = true;
+		} else {
+			this.availableTemplates.forEach((template) => {
+				templateDropdown.appendChild(
+					new Option(template.name, template.path)
+				);
+			});
+			templateDropdown.value = this.selectedTemplatePath;
+			templateDropdown.addEventListener("change", (e) => {
+				this.selectedTemplatePath = (
+					e.target as HTMLSelectElement
+				).value;
+			});
+		}
+		templateLabel.appendChild(templateDropdown);
+		// Insert before the search box or generate button for better layout
+		toolbar.insertBefore(
+			templateLabel,
+			toolbar.querySelector(".curator-search-input") ||
+				toolbar.querySelector(".curator-generate-button")
+		);
+	}
+
+	async loadView() {
+		const lang = this.plugin.settings.language;
 		const container = this.containerEl.children[1];
 		container.empty();
-		container.createEl("h2", { text: "Knowledge Curator" });
+		container.createEl("h2", { text: t(lang, "viewTitle") });
 
 		// Toolbar
 		const toolbar = container.createDiv("curator-toolbar");
-		toolbar.style.display = "flex";
-		toolbar.style.alignItems = "center";
-		toolbar.style.gap = "10px";
-		toolbar.style.marginBottom = "10px";
 
-		const refreshButton = toolbar.createEl("button", { text: "Refresh" });
+		const refreshButton = toolbar.createEl("button", {
+			cls: "curator-toolbar-button",
+		});
+		setIcon(refreshButton, "refresh-cw");
+		refreshButton.setAttribute(
+			"aria-label",
+			t(lang, "refreshButtonAriaLabel")
+		);
 		refreshButton.addEventListener("click", () => {
-			this.refreshUnresolvedLinks();
+			this.refreshUnresolvedLinks(true); // Force refresh
 		});
 
 		// Sort Dropdown
-		const sortLabel = toolbar.createEl("label", { text: " Sort by: " });
-		const sortDropdown = toolbar.createEl("select");
-		sortDropdown.appendChild(new Option("Frequency", "frequency"));
-		sortDropdown.appendChild(new Option("Alphabetical", "alphabetical"));
+		const sortLabel = toolbar.createEl("label", {
+			cls: "curator-toolbar-label",
+			text: ` ${t(lang, "sortLabel")} `,
+		});
+		const sortDropdown = toolbar.createEl("select", {
+			cls: "curator-toolbar-select",
+		});
+		sortDropdown.appendChild(
+			new Option(t(lang, "sortFrequency"), "frequency")
+		);
+		sortDropdown.appendChild(
+			new Option(t(lang, "sortAlphabetical"), "alphabetical")
+		);
 		sortDropdown.value = this.currentSortBy;
 		sortDropdown.addEventListener("change", (e) => {
 			this.currentSortBy = (e.target as HTMLSelectElement).value as
@@ -66,10 +158,15 @@ export class CuratorView extends ItemView {
 		sortLabel.appendChild(sortDropdown);
 
 		// Group Dropdown
-		const groupLabel = toolbar.createEl("label", { text: " Group by: " });
-		const groupDropdown = toolbar.createEl("select");
-		groupDropdown.appendChild(new Option("None", "none"));
-		groupDropdown.appendChild(new Option("Folder", "folder"));
+		const groupLabel = toolbar.createEl("label", {
+			cls: "curator-toolbar-label",
+			text: ` ${t(lang, "groupLabel")} `,
+		});
+		const groupDropdown = toolbar.createEl("select", {
+			cls: "curator-toolbar-select",
+		});
+		groupDropdown.appendChild(new Option(t(lang, "groupNone"), "none"));
+		groupDropdown.appendChild(new Option(t(lang, "groupFolder"), "folder"));
 		groupDropdown.value = this.currentGroupBy;
 		groupDropdown.addEventListener("change", (e) => {
 			this.currentGroupBy = (e.target as HTMLSelectElement).value as
@@ -82,8 +179,8 @@ export class CuratorView extends ItemView {
 		// Search Box
 		const searchBox = toolbar.createEl("input", {
 			type: "text",
-			placeholder: "Search links...",
-			attr: { style: "margin-left: auto; width: 200px;" },
+			placeholder: t(lang, "searchPlaceholder"),
+			cls: "curator-search-input",
 		});
 		searchBox.addEventListener("input", (e) => {
 			this.searchQuery = (
@@ -92,205 +189,684 @@ export class CuratorView extends ItemView {
 			this.renderLinks();
 		});
 
+		// Select All Button
+		const selectAllButton = toolbar.createEl("button", {
+			cls: "curator-select-all-button",
+			text: t(lang, "selectAllButtonText"),
+		});
+		selectAllButton.setAttribute(
+			"aria-label",
+			t(lang, "selectAllButtonAriaLabel")
+		);
+		selectAllButton.addEventListener("click", () => {
+			this.selectAllVisibleLinks();
+		});
+
+		// Deselect All Button
+		const deselectAllButton = toolbar.createEl("button", {
+			cls: "curator-deselect-all-button",
+			text: t(lang, "deselectAllButtonText"),
+		});
+		deselectAllButton.setAttribute(
+			"aria-label",
+			t(lang, "deselectAllButtonAriaLabel")
+		);
+		deselectAllButton.addEventListener("click", () => {
+			this.deselectAllLinks();
+		});
+
+		// Generate Selected Button
+		const generateButton = toolbar.createEl("button", {
+			cls: "curator-generate-button",
+			text: t(lang, "generateSelectedButtonText"),
+		});
+		generateButton.setAttribute(
+			"aria-label",
+			t(lang, "generateSelectedButtonAriaLabel")
+		);
+		generateButton.addEventListener("click", () => {
+			this.handleGenerateSelected();
+		});
+		this.updateGenerateButtonState(generateButton);
+
 		this.contentEl = container.createDiv("curator-content");
-		this.refreshUnresolvedLinks();
+
+		// Initial load: try cache, then scan
+		const cachedLinks = this.plugin.getCachedLinks();
+		if (cachedLinks) {
+			this.links = Array.from(cachedLinks.values()).flat();
+			this.renderLinks();
+			this.refreshUnresolvedLinks(false);
+		} else {
+			this.refreshUnresolvedLinks(true);
+		}
 	}
 
 	async onClose() {
-		// Nothing to clean up for now.
+		// Nothing specific to clean up for now.
 	}
 
-	async refreshUnresolvedLinks() {
-		new Notice("Scanning for unresolved links...");
-		this.contentEl.empty();
-		const statusEl = this.contentEl.createEl("div", {
-			text: "Scanning...",
-		});
+	async refreshUnresolvedLinks(forceRefresh = true) {
+		const lang = this.plugin.settings.language;
+		if (forceRefresh) {
+			new Notice(t(lang, "noticeScanning"));
+			this.contentEl.empty();
+		}
 
 		try {
-			this.links = await this.scanner.scanUnresolvedLinks();
-			this.renderLinks();
-			new Notice(
-				`Scan complete. Found ${this.links.length} unresolved links.`
-			);
+			const scannedLinks = await this.scanner.scanUnresolvedLinks();
+			this.links = scannedLinks;
+			const groupedForCache = this.scanner.groupLinksByFolder(this.links);
+			this.plugin.setCachedLinks(groupedForCache);
+
+			if (forceRefresh) {
+				this.renderLinks();
+				new Notice(
+					t(lang, "noticeScanComplete", { count: this.links.length })
+				);
+			} else {
+				this.renderLinks();
+			}
 		} catch (error) {
 			console.error("Error scanning vault:", error);
-			new Notice("Error scanning vault. Check console for details.");
-			statusEl.setText("Error scanning vault.");
+			new Notice(t(lang, "noticeErrorScanningVault"));
 		}
 	}
 
 	renderLinks() {
+		const lang = this.plugin.settings.language;
 		this.contentEl.empty();
+		const generateButton = this.containerEl.querySelector(
+			".curator-generate-button"
+		) as HTMLButtonElement;
+		if (generateButton) this.updateGenerateButtonState(generateButton);
 
 		let linksToRender = [...this.links];
 
-		// Apply search filter
 		if (this.searchQuery) {
 			linksToRender = linksToRender.filter((link) =>
 				link.linkText.toLowerCase().includes(this.searchQuery)
 			);
 		}
 
-		// Apply sorting
 		linksToRender = this.scanner.sortLinks(
 			linksToRender,
 			this.currentSortBy
 		);
 
-		const listContainer = this.contentEl.createEl("div");
-
 		if (linksToRender.length === 0) {
-			listContainer.createEl("p", {
+			this.contentEl.createEl("p", {
+				cls: "curator-empty-message",
 				text:
 					this.links.length === 0
-						? "No unresolved links found."
-						: "No links match your search.",
+						? t(lang, "emptyMessageNoLinks")
+						: t(lang, "emptyMessageNoSearchResults"),
 			});
 			return;
 		}
 
 		if (this.currentGroupBy === "folder") {
-			this.renderGroupedLinkList(listContainer, linksToRender);
+			this.renderGroupedLinkList(linksToRender);
 		} else {
-			this.renderLinkList(listContainer, linksToRender);
+			this.renderFlatLinkList(linksToRender);
 		}
 	}
 
-	renderLinkList(container: HTMLElement, links: UnresolvedLinkInfo[]) {
-		const ul = container.createEl("ul");
+	renderFlatLinkList(links: UnresolvedLinkInfo[]) {
+		const listContainer = this.contentEl.createDiv(
+			"curator-list-container"
+		);
 		links.forEach((linkInfo) => {
-			this.renderLinkItem(ul, linkInfo);
+			this.renderLinkItem(listContainer, linkInfo);
 		});
 	}
 
-	renderGroupedLinkList(container: HTMLElement, links: UnresolvedLinkInfo[]) {
+	renderGroupedLinkList(links: UnresolvedLinkInfo[]) {
+		const lang = this.plugin.settings.language;
 		const groupedLinks = this.scanner.groupLinksByFolder(links);
+		const listContainer = this.contentEl.createDiv(
+			"curator-list-container"
+		);
+
 		groupedLinks.forEach((linksInGroup, folderPath) => {
-			const folderName = folderPath === "" ? "/" : folderPath;
-			const folderHeader = container.createEl("h3", {
-				text: `📂 ${folderName}`,
+			const folderName =
+				folderPath === "" ? t(lang, "folderRootName") : folderPath;
+			const folderId = `folder-${folderPath.replace(/\//g, "-")}`;
+			const isExpanded = this.state.expandedFolders.has(folderId);
+
+			const folderHeader = listContainer.createDiv(
+				"curator-folder-header"
+			);
+			folderHeader.setAttribute("data-folder-id", folderId);
+
+			const folderIcon = folderHeader.createEl("span", {
+				cls: "curator-folder-icon",
 			});
-			folderHeader.style.cursor = "pointer";
+			setIcon(folderIcon, isExpanded ? "chevron-down" : "chevron-right");
+
+			folderHeader.createSpan({
+				cls: "curator-folder-name",
+				text: t(lang, "folderNameTemplate", {
+					name: folderName,
+					count: linksInGroup.length,
+				}),
+			});
 			folderHeader.addEventListener("click", () => {
-				const ul = folderHeader.nextElementSibling as HTMLUListElement;
-				if (ul) {
-					ul.style.display =
-						ul.style.display === "none" ? "block" : "none";
-				}
+				this.toggleFolder(folderId);
 			});
 
-			const ul = container.createEl("ul");
-			ul.style.marginLeft = "20px";
+			const linksContainer = listContainer.createDiv(
+				"curator-folder-content"
+			);
+			linksContainer.style.display = isExpanded ? "block" : "none";
+			linksContainer.style.maxHeight = isExpanded
+				? `${linksContainer.scrollHeight}px`
+				: "0px"; // For transition
+			linksContainer.setAttribute("data-folder-content-id", folderId);
+
 			linksInGroup.forEach((linkInfo) => {
-				this.renderLinkItem(ul, linkInfo);
+				this.renderLinkItem(linksContainer, linkInfo);
 			});
 		});
 	}
 
 	renderLinkItem(container: HTMLElement, linkInfo: UnresolvedLinkInfo) {
-		const li = container.createEl("li");
-		li.addClass("curator-link-item");
-		li.style.cursor = "pointer";
-		li.style.padding = "5px";
-		li.style.borderBottom = "1px solid var(--background-modifier-border)";
+		const lang = this.plugin.settings.language;
+		const linkId = `link-${linkInfo.linkText.replace(/\s/g, "-")}`;
+		const isSelected = this.state.selectedLinks.has(linkInfo.linkText);
+		const isExpanded = this.state.expandedLinks.has(linkInfo.linkText);
 
-		const linkTextSpan = li.createEl("span", {
+		const linkItem = container.createDiv("curator-link-item");
+		linkItem.setAttribute("data-link-id", linkId);
+		if (isSelected) linkItem.addClass("is-selected");
+
+		const linkHeader = linkItem.createDiv("curator-link-header");
+
+		const checkbox = linkHeader.createEl("input", {
+			type: "checkbox",
+			cls: "curator-link-checkbox",
+		});
+		checkbox.checked = isSelected;
+		checkbox.addEventListener("click", (e) => {
+			e.stopPropagation();
+			this.toggleLinkSelection(linkInfo.linkText);
+		});
+
+		const expandIcon = linkHeader.createEl("span", {
+			cls: "curator-link-expand-icon",
+		});
+		setIcon(expandIcon, isExpanded ? "chevron-down" : "chevron-right");
+		expandIcon.addEventListener("click", (e) => {
+			e.stopPropagation();
+			this.toggleLinkDetails(linkInfo.linkText, linkItem);
+		});
+
+		linkHeader.createSpan({
+			cls: "curator-link-text",
 			text: `[[${linkInfo.linkText}]]`,
 		});
-		linkTextSpan.style.fontWeight = "bold";
-
-		li.createEl("span", {
-			text: ` (被引用 ${linkInfo.frequency} 次)`,
-			attr: { style: "color: var(--text-muted); font-size: 0.9em;" },
+		linkHeader.createSpan({
+			cls: "curator-link-frequency",
+			text: `(${linkInfo.frequency})`,
 		});
 
-		// Optional: Add a button to show source files
-		const sourceButton = li.createEl("button", {
-			text: "...",
-			attr: {
-				style: "float: right; background: none; border: none; cursor: pointer;",
-			},
-		});
-		sourceButton.addEventListener("click", (e) => {
-			e.stopPropagation(); // Prevent triggering the main li click
-			this.showSourceFiles(linkInfo);
-		});
+		const detailsContainer = linkItem.createDiv("curator-link-details");
+		detailsContainer.style.display = isExpanded ? "block" : "none";
+		detailsContainer.style.maxHeight = isExpanded
+			? `${detailsContainer.scrollHeight}px`
+			: "0px"; // For transition
 
-		li.addEventListener("click", async () => {
-			await this.handleLinkClick(linkInfo);
+		detailsContainer.createEl("h4", {
+			text: t(lang, "referencedInHeader"),
+		});
+		const sourceList = detailsContainer.createEl("ul", {
+			cls: "curator-source-list",
+		});
+		linkInfo.sourceFiles.forEach((sourcePath) => {
+			sourceList.createEl("li", { text: sourcePath });
 		});
 	}
 
-	async handleLinkClick(linkInfo: UnresolvedLinkInfo) {
+	toggleFolder(folderId: string) {
+		const folderHeader = this.containerEl.querySelector(
+			`[data-folder-id="${folderId}"]`
+		) as HTMLElement;
+		const folderContent = this.containerEl.querySelector(
+			`[data-folder-content-id="${folderId}"]`
+		) as HTMLElement;
+		if (!folderHeader || !folderContent) return;
+
+		if (this.state.expandedFolders.has(folderId)) {
+			this.state.expandedFolders.delete(folderId);
+			folderContent.style.maxHeight = "0px";
+			setTimeout(() => {
+				// Wait for transition to finish
+				folderContent.style.display = "none";
+			}, 300); // Match transition duration
+		} else {
+			this.state.expandedFolders.add(folderId);
+			folderContent.style.display = "block";
+			// Force reflow to ensure transition applies
+			folderContent.style.maxHeight = `0px`;
+			setTimeout(() => {
+				folderContent.style.maxHeight = `${folderContent.scrollHeight}px`;
+			}, 10);
+		}
+		// Update icon
+		const icon = folderHeader.querySelector(
+			".curator-folder-icon"
+		) as HTMLElement;
+		if (icon)
+			setIcon(
+				icon,
+				this.state.expandedFolders.has(folderId)
+					? "chevron-down"
+					: "chevron-right"
+			);
+	}
+
+	toggleLinkDetails(linkText: string, linkItemElement: HTMLElement) {
+		const detailsContainer = linkItemElement.querySelector(
+			".curator-link-details"
+		) as HTMLElement;
+		const expandIcon = linkItemElement.querySelector(
+			".curator-link-expand-icon"
+		) as HTMLElement;
+		if (!detailsContainer || !expandIcon) return;
+
+		if (this.state.expandedLinks.has(linkText)) {
+			this.state.expandedLinks.delete(linkText);
+			detailsContainer.style.maxHeight = "0px";
+			setTimeout(() => {
+				detailsContainer.style.display = "none";
+			}, 300);
+		} else {
+			this.state.expandedLinks.add(linkText);
+			detailsContainer.style.display = "block";
+			detailsContainer.style.maxHeight = `0px`;
+			setTimeout(() => {
+				detailsContainer.style.maxHeight = `${detailsContainer.scrollHeight}px`;
+			}, 10);
+		}
+		setIcon(
+			expandIcon,
+			this.state.expandedLinks.has(linkText)
+				? "chevron-down"
+				: "chevron-right"
+		);
+	}
+
+	toggleLinkSelection(linkText: string) {
+		if (this.state.selectedLinks.has(linkText)) {
+			this.state.selectedLinks.delete(linkText);
+		} else {
+			this.state.selectedLinks.add(linkText);
+		}
+		this.renderLinks(); // Re-render to update checkbox and generate button state
+	}
+
+	updateGenerateButtonState(button: HTMLButtonElement) {
+		const lang = this.plugin.settings.language;
+		if (this.state.selectedLinks.size > 0) {
+			button.disabled = false;
+			button.textContent = `${t(lang, "generateSelectedButtonText")} (${
+				this.state.selectedLinks.size
+			})`;
+		} else {
+			button.disabled = true;
+			button.textContent = t(lang, "generateSelectedButtonDisabledText");
+		}
+	}
+
+	/**
+	 * Gets the list of link texts that are currently rendered in the view,
+	 * respecting search filters and grouping.
+	 */
+	private getCurrentRenderedLinkTexts(): string[] {
+		let linksToRender = [...this.links];
+
+		if (this.searchQuery) {
+			linksToRender = linksToRender.filter((link) =>
+				link.linkText.toLowerCase().includes(this.searchQuery)
+			);
+		}
+
+		linksToRender = this.scanner.sortLinks(
+			linksToRender,
+			this.currentSortBy
+		);
+
+		return linksToRender.map((link) => link.linkText);
+	}
+
+	selectAllVisibleLinks() {
+		const visibleLinkTexts = this.getCurrentRenderedLinkTexts();
+		visibleLinkTexts.forEach((linkText) => {
+			this.state.selectedLinks.add(linkText);
+		});
+		this.renderLinks(); // Re-render to update checkboxes and button state
+	}
+
+	deselectAllLinks() {
+		this.state.selectedLinks.clear();
+		this.renderLinks(); // Re-render to update checkboxes and button state
+	}
+
+	async handleGenerateSelected() {
+		const lang = this.plugin.settings.language;
+		if (this.state.selectedLinks.size === 0) {
+			new Notice(t(lang, "noticeNoLinksSelected"));
+			return;
+		}
+		if (!this.selectedTemplatePath) {
+			new Notice(t(lang, "noticeNoTemplateSelected"));
+			return;
+		}
+
+		const selectedLinkTexts = Array.from(this.state.selectedLinks);
+		const templateName = this.availableTemplates.find(
+			(t) => t.path === this.selectedTemplatePath
+		)?.name;
+		new Notice(
+			t(lang, "noticeStartingGeneration", {
+				count: selectedLinkTexts.length,
+				templateName: templateName || "Unknown",
+			})
+		);
+
+		for (const linkText of selectedLinkTexts) {
+			try {
+				const linkInfo = this.links.find(
+					(l) => l.linkText === linkText
+				);
+				if (!linkInfo) {
+					console.warn(
+						`Could not find link info for ${linkText} during generation.`
+					);
+					continue;
+				}
+				await this.generateForLink(linkInfo);
+				this.state.selectedLinks.delete(linkText);
+				this.plugin.clearCachedLinks();
+			} catch (error) {
+				console.error(`Failed to generate for ${linkText}:`, error);
+				new Notice(
+					t(lang, "noticeFailedToGenerate", { title: linkText })
+				);
+			}
+		}
+
+		new Notice(t(lang, "noticeBatchGenerationComplete"));
+		this.refreshUnresolvedLinks(true);
+	}
+
+	async generateForLink(linkInfo: UnresolvedLinkInfo) {
+		const lang = this.plugin.settings.language;
 		const { defaultNewNotePath } = this.plugin.settings;
 		const newNotePath = defaultNewNotePath
 			? `${defaultNewNotePath}/${linkInfo.linkText}.md`
 			: `${linkInfo.linkText}.md`;
 
-		// Check if file was created in the meantime (e.g., by user or another plugin)
 		if (this.app.vault.getAbstractFileByPath(newNotePath)) {
-			new Notice(`Note "[[${linkInfo.linkText}]]" already exists.`);
-			this.refreshUnresolvedLinks(); // Refresh to remove it from the list
+			new Notice(
+				t(lang, "noticeAlreadyExists", { title: linkInfo.linkText })
+			);
 			return;
 		}
 
-		new Notice(`Creating note for "[[${linkInfo.linkText}]]"...`);
+		new Notice(
+			t(lang, "noticeGeneratingFor", { title: linkInfo.linkText })
+		);
 
-		try {
-			let contextSnippets: string | undefined;
-			if (this.plugin.settings.enableContextAwareGeneration) {
-				new Notice(
-					`Gathering context for "[[${linkInfo.linkText}]]"...`
-				);
-				contextSnippets = await this.generator.getContextSnippets(
-					linkInfo.linkText
-				);
-			}
-
-			const generatedContent = await this.generator.generateForNoteTitle(
-				linkInfo.linkText,
-				contextSnippets
-			);
-
-			// Ensure the target directory exists
-			const targetDir = newNotePath.substring(
-				0,
-				newNotePath.lastIndexOf("/")
-			);
-			if (
-				targetDir &&
-				!(await this.app.vault.adapter.exists(targetDir))
-			) {
-				await this.app.vault.createFolder(targetDir);
-			}
-
-			await this.app.vault.create(newNotePath, generatedContent);
-
-			new Notice(
-				`Note "[[${linkInfo.linkText}]]" created and populated.`
-			);
-
-			// Optionally, open the new file
-			// this.app.workspace.getLeaf().openFile(newFile);
-
-			// Refresh the list
-			this.refreshUnresolvedLinks();
-		} catch (error) {
-			console.error(
-				`Error creating note for ${linkInfo.linkText}:`,
-				error
-			);
-			new Notice(
-				`Failed to create note for "[[${linkInfo.linkText}]]". See console for details.`
+		let contextSnippets: string | undefined;
+		if (this.plugin.settings.enableContextAwareGeneration) {
+			contextSnippets = await this.generator.getContextSnippets(
+				linkInfo.linkText
 			);
 		}
-	}
 
-	showSourceFiles(linkInfo: UnresolvedLinkInfo) {
-		const sourceList = linkInfo.sourceFiles
-			.map((path) => `- ${path}`)
-			.join("\n");
-		new Notice(`Sources for "[[${linkInfo.linkText}]]":\n${sourceList}`, 0); // 0 for no timeout
+		const generatedContent = await this.generator.generateForNoteTitle(
+			linkInfo.linkText,
+			contextSnippets,
+			this.selectedTemplatePath // Pass the selected template path
+		);
+
+		const targetDir = newNotePath.substring(
+			0,
+			newNotePath.lastIndexOf("/")
+		);
+		if (targetDir && !(await this.app.vault.adapter.exists(targetDir))) {
+			await this.app.vault.createFolder(targetDir);
+		}
+
+		await this.app.vault.create(newNotePath, generatedContent);
+		new Notice(
+			t(lang, "noticeSuccessfullyCreated", { title: linkInfo.linkText })
+		);
 	}
 }
+
+// Modern CSS Styles
+const style = document.createElement("style");
+style.textContent = `
+	.knowledge-curator-view {
+		padding: 10px;
+		background-color: var(--background-primary);
+		color: var(--text-normal);
+		font-family: var(--font-interface);
+	}
+
+	.knowledge-curator-view h2 {
+		margin-top: 0;
+		margin-bottom: 15px;
+		font-size: 1.5em;
+		font-weight: 600;
+		color: var(--text-accent);
+		border-bottom: 1px solid var(--background-modifier-border);
+		padding-bottom: 10px;
+	}
+
+	.curator-toolbar {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin-bottom: 15px;
+		padding: 10px;
+		background-color: var(--background-secondary);
+		border-radius: 8px;
+		border: 1px solid var(--background-modifier-border);
+		flex-wrap: wrap;
+	}
+
+	.curator-toolbar-button, .curator-generate-button {
+		padding: 6px 12px;
+		background-color: var(--interactive-accent);
+		color: var(--text-on-accent);
+		border: none;
+		border-radius: 6px;
+		cursor: pointer;
+		font-size: var(--font-ui-small);
+		transition: background-color 0.2s ease, transform 0.1s ease;
+	}
+
+	.curator-toolbar-button:hover, .curator-generate-button:hover:not(:disabled) {
+		background-color: var(--interactive-accent-hover);
+		transform: translateY(-1px);
+	}
+
+	.curator-toolbar-button:active, .curator-generate-button:active:not(:disabled) {
+		transform: translateY(0);
+	}
+
+	.curator-generate-button:disabled {
+		background-color: var(--background-modifier-error);
+		color: var(--text-muted);
+		cursor: not-allowed;
+		opacity: 0.6;
+	}
+
+	.curator-toolbar-label {
+		font-size: var(--font-ui-small);
+		color: var(--text-muted);
+		display: flex;
+		align-items: center;
+		gap: 5px;
+	}
+
+	.curator-toolbar-select, .curator-template-select, .curator-search-input {
+		padding: 6px 8px;
+		border-radius: 4px;
+		border: 1px solid var(--background-modifier-border);
+		background-color: var(--background-primary);
+		color: var(--text-normal);
+		font-size: var(--font-ui-small);
+		transition: border-color 0.2s ease, box-shadow 0.2s ease;
+	}
+
+	.curator-toolbar-select:focus, .curator-template-select:focus, .curator-search-input:focus {
+		outline: none;
+		border-color: var(--interactive-accent);
+		box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+	}
+	
+	.curator-search-input {
+		margin-left: auto; /* Pushes search to the right */
+		width: 200px;
+	}
+
+	.curator-content {
+		border: 1px solid var(--background-modifier-border);
+		border-radius: 8px;
+		background-color: var(--background-primary);
+		overflow-y: auto;
+		max-height: calc(100vh - 200px); /* Adjust based on toolbar height */
+	}
+
+	.curator-list-container {
+		padding: 0;
+	}
+
+	.curator-folder-header, .curator-link-header {
+		display: flex;
+		align-items: center;
+		padding: 10px 15px;
+		cursor: pointer;
+		transition: background-color 0.2s ease;
+		user-select: none; /* Prevent text selection */
+	}
+
+	.curator-folder-header:hover {
+		background-color: var(--background-modifier-hover);
+	}
+
+	.curator-folder-icon, .curator-link-expand-icon {
+		margin-right: 10px;
+		color: var(--text-muted);
+		flex-shrink: 0;
+	}
+
+	.curator-folder-name {
+		font-weight: 500;
+		color: var(--text-normal);
+		flex-grow: 1;
+	}
+
+	.curator-folder-content {
+		overflow: hidden;
+		transition: max-height 0.3s ease-in-out, padding 0.3s ease-in-out;
+	}
+	
+	.curator-folder-content[style*="display: block"] {
+		padding-left: 20px;
+		padding-right: 15px;
+		padding-bottom: 5px; /* Space between last item in folder and next header */
+	}
+
+
+	.curator-link-item {
+		border-radius: 6px;
+		margin-bottom: 5px;
+		background-color: var(--background-secondary-alt);
+		border: 1px solid transparent;
+		transition: border-color 0.2s ease, background-color 0.2s ease;
+	}
+
+	.curator-link-item.is-selected {
+		border-color: var(--interactive-accent);
+		background-color: var(--background-modifier-selected);
+	}
+
+	.curator-link-header {
+		padding: 8px 12px;
+		gap: 8px;
+	}
+
+	.curator-link-checkbox {
+		cursor: pointer;
+		flex-shrink: 0;
+	}
+
+	.curator-link-text {
+		font-weight: 500;
+		color: var(--text-normal);
+		flex-grow: 1;
+	}
+
+	.curator-link-frequency {
+		font-size: 0.85em;
+		color: var(--text-muted);
+		flex-shrink: 0;
+	}
+
+	.curator-link-details {
+		overflow: hidden;
+		transition: max-height 0.3s ease-in-out, padding 0.3s ease-in-out;
+		padding-left: 35px; /* Indent more than folder content */
+		padding-right: 15px;
+		padding-bottom: 10px;
+		color: var(--text-muted);
+		font-size: 0.9em;
+	}
+	
+	.curator-link-details h4 {
+		margin-top: 10px;
+		margin-bottom: 5px;
+		color: var(--text-accent);
+		font-size: 1em;
+		font-weight: 500;
+	}
+
+	.curator-source-list {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+
+	.curator-source-list li {
+		padding: 2px 0;
+		word-break: break-all;
+	}
+
+	.curator-empty-message {
+		text-align: center;
+		padding: 20px;
+		color: var(--text-muted);
+		font-style: italic;
+	}
+
+	/* Responsive adjustments */
+	@media (max-width: 600px) {
+		.curator-toolbar {
+			flex-direction: column;
+			align-items: stretch;
+		}
+		.curator-search-input {
+			margin-left: 0;
+			width: 100%;
+		}
+		.curator-toolbar-label {
+			justify-content: space-between;
+		}
+	}
+`;
+document.head.appendChild(style);

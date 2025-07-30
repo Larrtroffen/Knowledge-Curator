@@ -12,26 +12,26 @@ interface KnowledgeCuratorSettings {
 	apiEndpoint: string;
 	apiKey: string;
 	modelName: string;
-	templateFilePath: string;
-	// overwriteMode: boolean; // No longer needed with the new link-focused approach
-	// pendingStatusIdentifier: string; // No longer needed
-	// completedStatusIdentifier: string; // No longer needed
-	defaultNewNotePath: string; // New setting
-	enableContextAwareGeneration: boolean; // New setting
+	templateFolderPath: string; // Changed from file path to folder path
+	defaultNewNotePath: string;
+	enableContextAwareGeneration: boolean;
+	language: "en" | "zh"; // New setting for language
 }
 
 const DEFAULT_SETTINGS: KnowledgeCuratorSettings = {
 	apiEndpoint: "",
 	apiKey: "",
 	modelName: "gpt-3.5-turbo",
-	templateFilePath: "Templates/Knowledge_Curator_Template.md",
+	templateFolderPath: "Templates", // Changed to folder path
 	defaultNewNotePath: "", // Default to root of vault
 	enableContextAwareGeneration: true, // Default to enabled
+	language: "en", // Default to English
 };
 
 export default class KnowledgeCurator extends Plugin {
 	settings: KnowledgeCuratorSettings;
 	view: CuratorView | null = null;
+	cachedUnresolvedLinks: Map<string, any> | null = null; // Cache for unresolved links, keyed by folder/group
 
 	async onload() {
 		await this.loadSettings();
@@ -124,6 +124,18 @@ export default class KnowledgeCurator extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
+
+	getCachedLinks(): Map<string, any> | null {
+		return this.cachedUnresolvedLinks;
+	}
+
+	setCachedLinks(links: Map<string, any>) {
+		this.cachedUnresolvedLinks = links;
+	}
+
+	clearCachedLinks() {
+		this.cachedUnresolvedLinks = null;
+	}
 }
 
 class KnowledgeCuratorSettingTab extends PluginSettingTab {
@@ -184,16 +196,16 @@ class KnowledgeCuratorSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Template File Path")
+			.setName("Template Folder Path")
 			.setDesc(
-				"Path to the template file within your vault (e.g., Templates/Concept_Template.md). Use {{title}} and {{context_snippets}} as placeholders."
+				"Path to the folder containing your template files (e.g., Templates). Templates should be markdown files and can use {{title}} and {{context_snippets}} as placeholders."
 			)
 			.addText((text) =>
 				text
-					.setPlaceholder("Templates/Knowledge_Curator_Template.md")
-					.setValue(this.plugin.settings.templateFilePath)
+					.setPlaceholder("Templates")
+					.setValue(this.plugin.settings.templateFolderPath)
 					.onChange(async (value) => {
-						this.plugin.settings.templateFilePath = value;
+						this.plugin.settings.templateFolderPath = value;
 						await this.plugin.saveSettings();
 					})
 			);
@@ -227,5 +239,22 @@ class KnowledgeCuratorSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+
+		new Setting(containerEl)
+			.setName("Interface Language")
+			.setDesc("Choose the language for the plugin's interface.")
+			.addDropdown((dropdown) => {
+				dropdown.addOption("en", "English");
+				dropdown.addOption("zh", "中文 (Chinese)");
+				dropdown.setValue(this.plugin.settings.language);
+				dropdown.onChange(async (value) => {
+					this.plugin.settings.language = value as "en" | "zh";
+					await this.plugin.saveSettings();
+					// Optionally, force a redraw of the view if it's open
+					if (this.plugin.view) {
+						this.plugin.view.onOpen(); // Re-initialize the view to apply new language
+					}
+				});
+			});
 	}
 }
