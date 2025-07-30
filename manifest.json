@@ -1,11 +1,11 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
-	"version": "1.0.0",
-	"minAppVersion": "0.15.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"id": "knowledge-curator",
+	"name": "Knowledge Curator",
+	"version": "0.1.0",
+	"minAppVersion": "1.0.0",
+	"description": "A structure-driven content population tool for your Obsidian Vault.",
+	"author": "Larrtroffen",
+	"authorUrl": "https://github.com/Larrtroffen",
+	"fundingUrl": "https://github.com/Larrtroffen/Knowledge-Curator",
 	"isDesktopOnly": false
 }
