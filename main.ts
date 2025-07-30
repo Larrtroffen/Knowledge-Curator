@@ -13,9 +13,11 @@ interface KnowledgeCuratorSettings {
 	apiKey: string;
 	modelName: string;
 	templateFilePath: string;
-	overwriteMode: boolean; // true for overwrite, false for append
-	pendingStatusIdentifier: string;
-	completedStatusIdentifier: string;
+	// overwriteMode: boolean; // No longer needed with the new link-focused approach
+	// pendingStatusIdentifier: string; // No longer needed
+	// completedStatusIdentifier: string; // No longer needed
+	defaultNewNotePath: string; // New setting
+	enableContextAwareGeneration: boolean; // New setting
 }
 
 const DEFAULT_SETTINGS: KnowledgeCuratorSettings = {
@@ -23,9 +25,8 @@ const DEFAULT_SETTINGS: KnowledgeCuratorSettings = {
 	apiKey: "",
 	modelName: "gpt-3.5-turbo",
 	templateFilePath: "Templates/Knowledge_Curator_Template.md",
-	overwriteMode: true,
-	pendingStatusIdentifier: "pending",
-	completedStatusIdentifier: "completed",
+	defaultNewNotePath: "", // Default to root of vault
+	enableContextAwareGeneration: true, // Default to enabled
 };
 
 export default class KnowledgeCurator extends Plugin {
@@ -59,7 +60,7 @@ export default class KnowledgeCurator extends Plugin {
 			name: "Refresh Curator scan",
 			callback: () => {
 				if (this.view) {
-					this.view.refreshVaultTree();
+					this.view.refreshUnresolvedLinks(); // Updated method name
 				} else {
 					new Notice("Please open the Knowledge Curator view first.");
 				}
@@ -185,7 +186,7 @@ class KnowledgeCuratorSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Template File Path")
 			.setDesc(
-				"Path to the template file within your vault (e.g., Templates/Concept_Template.md)."
+				"Path to the template file within your vault (e.g., Templates/Concept_Template.md). Use {{title}} and {{context_snippets}} as placeholders."
 			)
 			.addText((text) =>
 				text
@@ -198,52 +199,31 @@ class KnowledgeCuratorSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Generation Mode")
+			.setName("Default Folder for New Notes")
 			.setDesc(
-				"Choose to overwrite existing content or append new content."
+				"Newly created notes from unresolved links will be placed in this folder. Leave empty to create in the vault root."
 			)
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("overwrite", "Overwrite")
-					.addOption("append", "Append")
-					.setValue(
-						this.plugin.settings.overwriteMode
-							? "overwrite"
-							: "append"
-					)
+			.addText((text) =>
+				text
+					.setPlaceholder("e.g., Inbox/Unresolved")
+					.setValue(this.plugin.settings.defaultNewNotePath)
 					.onChange(async (value) => {
-						this.plugin.settings.overwriteMode =
-							value === "overwrite";
+						this.plugin.settings.defaultNewNotePath = value;
 						await this.plugin.saveSettings();
 					})
 			);
 
 		new Setting(containerEl)
-			.setName("Pending Status Identifier")
+			.setName("Enable Context-Aware Generation")
 			.setDesc(
-				"The frontmatter value for a pending note (e.g., pending)."
+				"If enabled, the plugin will gather context from notes referencing the link and include it in the prompt for more relevant content generation."
 			)
-			.addText((text) =>
-				text
-					.setPlaceholder("pending")
-					.setValue(this.plugin.settings.pendingStatusIdentifier)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableContextAwareGeneration)
 					.onChange(async (value) => {
-						this.plugin.settings.pendingStatusIdentifier = value;
-						await this.plugin.saveSettings();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Completed Status Identifier")
-			.setDesc(
-				"The frontmatter value for a completed note (e.g., completed, curated)."
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("completed")
-					.setValue(this.plugin.settings.completedStatusIdentifier)
-					.onChange(async (value) => {
-						this.plugin.settings.completedStatusIdentifier = value;
+						this.plugin.settings.enableContextAwareGeneration =
+							value;
 						await this.plugin.saveSettings();
 					})
 			);

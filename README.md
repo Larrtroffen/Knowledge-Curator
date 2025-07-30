@@ -1,85 +1,122 @@
 # Obsidian Knowledge Curator (知识策展人)
 
-“Knowledge Curator” (知识策展人) 是一个 Obsidian 插件，它作为一个结构驱动的内容填充工具，旨在帮助您管理和丰富您的 Vault。它会扫描您现有的笔记，并根据预设模板和 AI 服务，一键为“待填充”的笔记生成详细内容。
+“Knowledge Curator” (知识策展人) 是一个 Obsidian 插件，它作为一个**链接驱动的知识图谱扩展工具**。它会扫描您 Vault 中所有笔记里的 `[[]]` 链接，识别出那些指向尚不存在的文件的“悬空链接”，并以智能排序的方式呈现给您。您只需选择一个悬空链接，插件就会自动为其创建对应的文件，并调用 AI 填充内容，从而帮助您有机地扩展知识网络。
 
-## 核心功能
+## 核心理念与工作流
 
-1.  **保险库状态树 (Vault Status Tree):**
+1.  **扫描 (Scan):** 插件启动或用户手动刷新时，遍历 Vault 中所有 `.md` 文件，解析出每一个 `[[]]` 链接。
+2.  **识别 (Identify):** 对于每一个解析出的链接，利用 Obsidian 的 API 检查其是否指向一个已存在的文件。所有指向不存在文件的链接都被识别为“悬空链接”。
+3.  **聚合与排序 (Aggregate & Sort):**
+    -   对所有悬空链接进行聚合统计。
+    -   按照用户选择的排序逻辑进行排序：
+        -   **按频次 (Frequency):** 被引用次数最多的悬空链接排在最前。
+        -   **按字母顺序 (Alphabetical):** 从 A 到 Z 排序。
+4.  **展示 (Display):** 在专属的侧边栏中，以一个清晰的列表（或按文件夹分组的列表）展示所有排序后的悬空链接。
+5.  **选择与创建 (Select & Create):** 用户在列表中点击一个悬空链接。插件会立即以该链接的名称为标题，在用户指定的默认位置创建一个新的 `.md` 文件。
+6.  **填充 (Populate):** 以该标题为关键词，使用预设模板调用 OpenAI-compatible 接口，生成内容并填充到新创建的文件中。如果启用了上下文感知生成，还会收集引用了该链接的其他笔记的上下文。
+7.  **刷新 (Refresh):** 操作完成后，侧边栏列表自动刷新，刚刚被处理的链接从“悬空链接”列表中消失。
 
-    -   在专属的侧边栏视图中，以列表形式（未来将升级为文件目录树）展示 Vault 中所有 Markdown 笔记。
-    -   每个笔记前都有一个状态图标，清晰指示其内容状态：
-        -   ⚪️ **待填充 (Pending):** 笔记为空、无 Frontmatter 状态标识，或状态为 `status: pending`。
-        -   🟢 **已完成 (Completed):** Frontmatter 状态为 `status: completed` (或用户自定义的完成标识)。
-        -   🟡 **处理中 (In Progress):** 插件正在为该笔记生成内容。
-        -   🔴 **错误 (Error):** 上次生成时发生 API 或其他错误。
+## 关键功能与特性
 
-2.  **一键内容生成 (One-Click Population):**
+1.  **悬空链接浏览器 (Unresolved Link Explorer):**
 
-    -   在侧边栏中单击任何“待填充”的笔记。
-    -   插件会以该笔记的标题作为关键词，结合用户预设的模板，调用 OpenAI 兼容的 AI 接口生成内容。
-    -   生成的内容会覆盖（未来可配置为追加）到原笔记中。
-    -   生成成功后，笔记的 Frontmatter 状态会自动更新，侧边栏视图也会实时刷新。
+    -   插件的核心 UI，一个专属的侧边栏视图。
+    -   **主视图:** 一个可排序、可过滤、可分组的列表，展示所有悬空链接。
+    -   **每项信息:** 列表中的每一项都包含关键信息，如：
+        -   **链接名称:** `[[数字利维坦]]`
+        -   **引用频次:** `(被引用 5 次)`
+        -   **来源文件:** 点击 `...` 按钮可查看所有引用了该链接的源文件路径。
 
-3.  **模板驱动生成 (Template-Driven Generation):**
+2.  **强大的排序与分组功能 (Advanced Sorting & Grouping):**
 
-    -   用户可以在插件设置中指定一个 Vault 内的笔记作为模板文件 (例如 `Templates/Concept_Template.md`)。
-    -   插件会读取模板内容，并将占位符（如 `{{title}}`）替换为当前笔记的标题，然后发送给 AI 进行内容生成。这使得提示词 (Prompt) 的定制非常灵活。
+    -   侧边栏顶部提供下拉菜单，让用户可以动态切换视图：
+        -   **排序方式:**
+            -   `按引用频次` (默认): 最能体现当前知识网络中“最需要被定义”的概念。
+            -   `按字母顺序` (A-Z)。
+        -   **分组方式:**
+            -   `无分组 (Flat List)`: 简单的列表。
+            -   `按文件夹分组`: 将悬空链接按照它们**首次被引用**的文件的所在文件夹进行分组。这能帮助用户聚焦于特定领域的知识扩展。
 
-4.  **纯 OpenAI 兼容接口支持:**
+3.  **一键定义链接 (One-Click Definition):**
 
-    -   设置中仅需提供 API 端点 URL (API Endpoint URL) 和 API 密钥 (API Key)。
-    -   这保证了插件可以无缝对接 OpenAI 官方 API、Azure OpenAI，以及任何通过 Ollama、LM Studio 等工具搭建的本地 LLM 服务，只要其提供 OpenAI 兼容的接口。
-    -   用户还可以选择具体的模型名称（如 `gpt-4-turbo`, `llama3:instruct`）。
+    -   用户在列表中点击任何一个悬空链接。
+    -   插件立即执行“创建与填充”工作流。
+    -   无需任何确认对话框（因为是创建新文件，没有覆盖风险），追求极致的效率。
 
-5.  **智能状态管理 (Intelligent Status Management):**
-    -   生成成功后，插件会自动在笔记的 Frontmatter 区域添加或更新状态信息，例如：
-        ```yaml
-        ---
-        status: completed
-        curated_by: KnowledgeCurator
-        curated_at: 2024-05-21T10:00:00
-        ---
-        ```
-    -   这不仅用于在侧边栏中更新图标，也方便用户使用 Dataview 等其他插件进行后续的查询和管理。
+4.  **上下文感知生成 (Context-Aware Generation):**
 
-## 插件架构
+    -   这是一个高级但非常强大的特性。在为悬空链接生成内容时，插件可以**自动收集**引用了该链接的所有笔记的上下文。
+    -   **实现方式:**
+        1.  当用户点击 `[[数据治理]]` 时，插件找到所有包含此链接的笔记（如 `数字政府.md`, `智慧城市.md`）。
+        2.  从这些笔记中提取 `[[数据治理]]` 所在的段落或句子。
+        3.  将这些上下文片段注入到 Prompt 中，告诉 AI：“请在以下上下文中定义‘数据治理’：...”。
+        4.  这使得生成的内容与现有知识网络的关联性极强，而不是泛泛而谈。
+    -   此功能可在设置中开启或关闭。
 
-本插件采用模块化设计，主要包含以下几个核心部分：
+5.  **模板驱动与纯 OpenAI-Compatible 接口:**
+    -   用户可以在设置中指定一个**模板文件路径**。
+    -   模板中可以使用 `{{title}}` 和 `{{context_snippets}}` 占位符。
+    -   API 设置保持不变，只要求 **Endpoint URL** 和 **API Key**。
+
+## 用户界面与交互 (UI/UX)
+
+1.  **侧边栏视图 (The "Link Weaver" Panel):**
+
+    -   **顶部工具栏:**
+        -   **刷新 (Refresh)** 按钮。
+        -   **排序方式** 下拉菜单 (`频次`, `A-Z`)。
+        -   **分组方式** 下拉菜单 (`无`, `按文件夹`)。
+        -   一个 **搜索框**，用于快速过滤悬空链接列表。
+    -   **主体区域:**
+        -   根据用户的排序/分组选择，展示悬空链接列表。
+        -   每个链接条目都是一个可点击的按钮。
+        -   点击条目右侧的 `...` 图标，可以展开显示引用了该链接的所有源文件列表，方便用户追溯来源。
+    -   **底部状态栏:**
+        -   显示总的悬空链接数量。
+        -   通过 Obsidian 的 Notice 系统显示当前操作状态，如“正在为 `[[数据治理]]` 生成内容...”、“生成成功！”。
+
+2.  **设置页面 (Settings Tab):**
+    -   **API Configuration:** `Endpoint URL`, `API Key`, `Model Name`。
+    -   **Template Configuration:** `Template File Path` (支持 `{{title}}` 和 `{{context_snippets}}` 占位符)。
+    -   **Generation Configuration:**
+        -   `Default Folder for New Notes`: 指定新创建的笔记保存在哪个文件夹。
+        -   `Enable Context-Aware Generation`: 一个开关，用于启用/禁用上下文感知功能。
+
+## 技术架构 (Technical Architecture)
 
 ```mermaid
 graph TD
     subgraph Obsidian Plugin: Knowledge Curator
-        A[UI: Curator Sidebar] -- 用户点击笔记 --> B{主控制器 (main.ts)};
-        C[命令: 刷新列表] -- 用户操作 --> B;
-        D[设置页面] -- 配置数据 --> B;
+        A[UI: Link Weaver Sidebar] -- User clicks link --> B{Main Controller};
+        C[Commands: Refresh Links] -- User action --> B;
+        D[Settings Tab] -- Config data --> B;
 
-        B -- 触发扫描 --> E[Vault 扫描器 (VaultScanner.ts)];
-        E -- 扫描所有 .md 文件并读取 frontmatter --> F[Obsidian Vault API];
-        E -- 构建列表数据结构 --> B;
-        B -- 渲染列表 --> A;
+        B -- Triggers scan --> E[Link Extractor & Aggregator];
+        E -- Scans all .md files --> F[Obsidian Vault API: fileManager];
+        E -- Gets link metadata (resolved/unresolved) --> G[Obsidian Vault API: metadataCache];
+        E -- Builds sorted/grouped list of unresolved links --> B;
+        B -- Renders list --> A;
 
-        B -- 响应笔记点击 (标题, 模板) --> G[内容生成器 (GeneratorService.ts)];
-        G -- 格式化 Prompt --> H[API 调用服务 (ApiService.ts)];
-        H -- 发送请求 (端点, 密钥, 模型, Prompt) --> I[外部: LLM 端点];
-        I -- 返回 Markdown 内容 --> H;
-        H -- 返回内容至 --> G;
-        G -- 返回内容至 --> B;
+        B -- On link click (link text, context) --> H[Generator Service];
+        H -- Formats prompt with title & context --> I[OpenAI-Compatible API Service];
+        I -- Sends request --> J[External: LLM Endpoint];
+        J -- Returns Markdown content --> I;
+        I -- Returns content to --> H;
+        H -- Returns content to --> B;
 
-        B -- 写入内容并更新 frontmatter --> F;
-        B -- 请求刷新列表或更新单个节点 --> E;
+        B -- Creates new note with content --> F;
+        B -- Triggers list refresh --> E;
     end
-
-    style A fill:#cde, stroke:#333
-    style E fill:#cde, stroke:#333
-    style G fill:#cde, stroke:#333
 ```
 
--   **`main.ts`**: 插件的入口点。负责注册侧边栏视图、命令（如打开视图、刷新扫描）和设置页面。是插件生命周期管理的核心。
--   **`CuratorView.ts`**: 侧边栏 UI 的核心。负责渲染笔记列表、处理用户点击事件、调用内容生成服务，并更新笔记文件和其 Frontmatter。它直接与用户交互。
--   **`VaultScanner.ts`**: 负责遍历 Vault，通过 `app.metadataCache` 读取每个 Markdown 文件的 Frontmatter，判断其状态（待填充、已完成等），并构建一个供 UI 渲染的数据结构。
--   **`GeneratorService.ts`**: 内容生成的核心协调器。它接收笔记标题，读取用户指定的模板文件，将标题注入模板形成最终的 Prompt，然后调用 `ApiService`。
--   **`ApiService.ts`**: 专门的网络通信模块。负责与 OpenAI 兼容的 API 端点进行通信。它构造请求头（包括 `Authorization`）和请求体，处理网络请求和可能发生的错误，并返回 AI 生成的原始文本内容。
--   **设置 (`KnowledgeCuratorSettings`)**: 在 `main.ts` 中定义，包含了所有用户可配置的选项，如 API 信息、模板路径、状态标识符等。设置数据通过 Obsidian 的 API 进行加载和保存。
+-   **`VaultScanner.ts`:** 这是本方案的技术核心。
+    -   它需要使用 `this.app.vault.getMarkdownFiles()` 遍历所有文件。
+    -   对于每个文件，使用 `this.app.metadataCache.getFileCache(file)?.links` 来获取所有链接。
+    -   对于每个链接，使用 `this.app.metadataCache.getFirstLinkpathDest(link.link, file.path)` 来检查其是否为 `null`。如果为 `null`，则为悬空链接。
+    -   将所有悬空链接及其来源文件路径聚合到一个数据结构中，进行计数和分组。
+-   **`GeneratorService.ts`:** 需要增加一个 `getContextSnippets(linkText)` 方法。这个方法会反向查找所有引用了 `linkText` 的文件，并从这些文件中提取相关段落。
+-   **`CuratorView.ts`:** 负责渲染新的链接列表 UI，处理排序、分组、搜索等用户交互，并调用 `GeneratorService` 来完成“一键定义”的流程。
+-   **其他模块 (`main.ts`, `ApiService.ts`, `Settings.ts`)** 的职责与之前类似，但处理的数据从“文件状态”变为了“悬空链接列表”。
 
 ## 开发与构建
 
@@ -110,20 +147,14 @@ graph TD
     ```bash
     npm run build
     ```
-    此命令会进行类型检查并编译生成最终的 `main.js`。
+    此命令会进行类型检查并编译生成最终的 `main.js`。构建产物将位于 `dist` 文件夹中。
 
 ### 在 Obsidian 中手动安装插件
 
-1.  运行 `npm run build` 生成 `main.js`、`manifest.json` 和 `styles.css` (如果有)。
+1.  运行 `npm run build`。生成的插件文件 (`main.js`, `manifest.json`, `versions.json`) 将位于 `dist` 文件夹。
 2.  在您的 Obsidian Vault 中，创建一个文件夹，路径为 `.obsidian/plugins/knowledge-curator/` (其中 `knowledge-curator` 是 `manifest.json` 中的 `id`)。
-3.  将生成的 `main.js`、`manifest.json` 和 `styles.css` 文件复制到该文件夹中。
+3.  将 `dist` 文件夹中的 `main.js`、`manifest.json` 和 `versions.json` 文件复制到该文件夹中。
 4.  重启 Obsidian 并在“设置 -> 插件”中启用 “Knowledge Curator”。
-
-## 路线图
-
--   **Phase 1 (MVP - 已完成):** 实现核心的扫描、状态识别、点击生成和 API 调用功能，以扁平列表形式展示笔记。
--   **Phase 2 (核心 UI/UX):** 将侧边栏的扁平列表升级为可交互的**目录树**，实现状态图标的实时更新，并加入更友好的确认对话框。
--   **Phase 3 (高级功能与完善):** 探索批量处理、上下文感知生成（结合父笔记、子笔记或链接笔记内容）以及更精细的模板变量支持。
 
 ## 许可证
 
