@@ -22,7 +22,6 @@ interface KnowledgeCuratorSettings {
 	modelName: string;
 	promptTemplates: PromptTemplate[]; // New prompt-based template system
 	defaultNewNotePath: string;
-	enableContextAwareGeneration: boolean;
 	language: "en" | "zh"; // New setting for language
 }
 
@@ -37,7 +36,6 @@ const DEFAULT_SETTINGS: KnowledgeCuratorSettings = {
 		},
 	], // Default to a simple prompt template
 	defaultNewNotePath: "", // Default to root of vault
-	enableContextAwareGeneration: true, // Default to enabled
 	language: "en", // Default to English
 };
 
@@ -193,6 +191,10 @@ class TemplateModal extends Modal {
 				promptInput = text;
 				promptInput.setValue(this.template.prompt).onChange((value) => {
 					this.template.prompt = value;
+					// Auto-resize the textarea
+					text.inputEl.style.height = "auto";
+					text.inputEl.style.height =
+						text.inputEl.scrollHeight + "px";
 				});
 			});
 
@@ -381,21 +383,6 @@ class KnowledgeCuratorSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.defaultNewNotePath)
 					.onChange(async (value) => {
 						this.plugin.settings.defaultNewNotePath = value;
-						await this.plugin.saveSettings();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Enable Context-Aware Generation")
-			.setDesc(
-				"If enabled, the plugin will gather context from notes referencing the link and include it in the prompt for more relevant content generation."
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.enableContextAwareGeneration)
-					.onChange(async (value) => {
-						this.plugin.settings.enableContextAwareGeneration =
-							value;
 						await this.plugin.saveSettings();
 					})
 			);

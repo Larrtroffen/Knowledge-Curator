@@ -1,22 +1,27 @@
-# Obsidian Knowledge Curator (知识策展人)
+# Obsidian Knowledge Curator
 
-<a href="https://github.com/Larrtroffen/Knowledge-Curator/releases"><img src="https://img.shields.io/github/v/release/Larrtroffen/Knowledge-Curator?style=flat-square" alt="Latest Release"></a>
-<a href="https://github.com/Larrtroffen/Knowledge-Curator/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Larrtroffen/Knowledge-Curator?style=flat-square" alt="License"></a>
-<a href="https://obsidian.md/"><img src="https://img.shields.io/badge/Obsidian-Plugin-black?style=flat-square&logo=obsidian&logoColor=white" alt="Obsidian Plugin"></a>
+[![Latest Release](https://img.shields.io/github/v/release/Larrtroffen/Knowledge-Curator?style=flat-square)](https://github.com/Larrtroffen/Knowledge-Curator/releases)
+[![License](https://img.shields.io/github/license/Larrtroffen/Knowledge-Curator?style=flat-square)](https://github.com/Larrtroffen/Knowledge-Curator/blob/main/LICENSE)
+[![Obsidian Plugin](https://img.shields.io/badge/Obsidian-Plugin-black?style=flat-square&logo=obsidian&logoColor=white)](https://obsidian.md/)
 
-**Knowledge Curator** (知识策展人) is an Obsidian plugin that acts as a **link-driven knowledge graph extender**. It scans your vault for all `[[wikilinks]]`, identifies "unresolved links" (links that point to non-existent files), and presents them in an intelligently sorted list. With a single click, you can create the corresponding file and use AI to populate it with content, helping you organically grow your knowledge network.
+**中文说明 (Chinese Introduction)** | [README.zh.md](README.zh.md)
+
+---
+
+**Knowledge Curator** is an Obsidian plugin that acts as a **link-driven knowledge graph extender**. It scans your vault for all `[[wikilinks]]`, identifies "unresolved links" (links that point to non-existent files), and presents them in an intelligently sorted list. With a single click, you can create the corresponding file and use AI to populate it with content, helping you organically grow your knowledge network.
 
 ## ✨ Key Features
 
 -   **🔍 Unresolved Link Explorer**: A dedicated sidebar view that lists all your broken links, making it easy to spot gaps in your knowledge base.
--   **🧠 One-Click AI Generation**: Select any unresolved link, and the plugin will automatically create a new note and fill it with AI-generated content based on a template of your choice.
+-   **🧠 One-Click AI Generation**: Select any unresolved link, and the plugin will automatically create a new note and fill it with AI-generated content based on a prompt template of your choice.
+-   **📝 Prompt Template System**: Define and manage custom prompt templates directly in the settings. Use the `{{title}}` placeholder to dynamically insert the link name into your prompts. This offers greater flexibility and control over the AI's output.
 -   **📊 Smart Sorting & Grouping**: Sort links by frequency (most referenced first) or alphabetically. Group them by the folder they were found in to focus on specific areas of your vault.
 -   **🔗 Context-Aware Generation**: (Optional) The plugin can gather context from all notes that reference a link, providing the AI with background information for more relevant and specific content.
--   **📝 Template-Driven**: Use your own note templates with `{{title}}` and `{{context_snippets}}` placeholders to define the structure of the generated content.
 -   **🌐 Internationalization**: Full support for English and Chinese (中文) interfaces, switchable in the settings.
 -   **✅ Batch Operations**: Select multiple links using "Select All" or "Deselect All" buttons and generate content for them in a batch.
 -   **🔍 Search & Filter**: Quickly find specific unresolved links using the built-in search bar.
--   **⚙️ Highly Configurable**: Easily configure your AI API endpoint, model, template folder, and other generation preferences.
+-   **⚙️ Highly Configurable**: Easily configure your AI API endpoint, model, and other generation preferences.
+-   **🎨 Polished UI/UX**: Enjoy smooth animations and a responsive interface with non-intrusive modals for a better user experience.
 
 ## 🚀 Getting Started
 
@@ -55,11 +60,15 @@
     -   **API Endpoint URL**: Your OpenAI-compatible API endpoint (e.g., `https://api.openai.com/v1/chat/completions`).
     -   **API Key**: Your secret API key.
     -   **Model Name**: The model to use for generation (e.g., `gpt-4`, `gpt-3.5-turbo`).
-3.  **Template Configuration**:
-    -   **Template Folder Path**: Path to a folder containing your `.md` template files (e.g., `Templates`). The plugin will list all templates in this folder.
+3.  **Prompt Templates**:
+    -   This is where you define the instructions for the AI. You can add, edit, or delete prompt templates.
+    -   Click "Add new template". A modal will appear.
+    -   **Template Name**: Give your template a unique name (e.g., "Detailed Summary").
+    -   **Prompt**: Enter the actual prompt for the AI. Use `{{title}}` as a placeholder for the unresolved link's name. For example: `Please provide a comprehensive summary of the topic: {{title}}. Include key concepts, important figures, and historical context.`
+    -   Click "Save" to add the template.
 4.  **Generation Configuration**:
     -   **Default Folder for New Notes**: The folder where new notes will be created (e.g., `Inbox`). Leave empty to create in the vault root.
-    -   **Enable Context-Aware Generation**: Toggle to gather context from referencing notes.
+    -   **Enable Context-Aware Generation**: If enabled, the plugin will find all notes that reference the unresolved link and append their content to the AI prompt as context.
 5.  **Interface**:
     -   **Interface Language**: Choose between `English` and `中文 (Chinese)`.
 
@@ -68,10 +77,11 @@
 1.  **Open the View**: Open the Knowledge Curator view from the Obsidian ribbon or by running the `Open Knowledge Curator view` command.
 2.  **Scan for Links**: The plugin automatically scans for unresolved links on load. You can manually refresh using the refresh button in the sidebar.
 3.  **Explore Links**: Browse the list of unresolved links. You can sort, group, and search to find the ones you want to address.
-4.  **Select & Generate**:
+4.  **Select a Prompt Template**: In the Curator View's toolbar, use the dropdown to select one of your configured prompt templates.
+5.  **Select & Generate**:
     -   **Single Link**: Click the checkbox next to a link, then click the "Generate Selected" button.
     -   **Multiple Links**: Use the "Select All" button to select all visible links, or manually select multiple checkboxes. Then click "Generate Selected".
-5.  **Review & Refine**: The plugin will create the new note and fill it with AI-generated content. The link will disappear from the unresolved list. You can then open the new note and review or edit the content.
+6.  **Review & Refine**: The plugin will create the new note (e.g., `My Link Title.md`) and fill it with the entire AI-generated output based on your chosen prompt. The link will disappear from the unresolved list. You can then open the new note and review or edit the content.
 
 ## 🏗️ Workflow Diagram
 
@@ -79,10 +89,10 @@
 graph TD
     A[Open Curator View] --> B[Scan Vault for Unresolved Links];
     B --> C{Display Links in Sidebar};
-    C -- User Selects Link(s) --> D[Create New Note File];
-    D -- Optional: Gather Context --> E[Format Prompt with Template];
+    C -- User Selects Link(s) & Prompt Template --> D[Create New Note File];
+    D -- Optional: Gather Context --> E[Format Prompt with {{title}}];
     E --> F[Call AI API for Content];
-    F --> G[Populate New Note];
+    F --> G[Populate New Note with AI Output];
     G --> H[Refresh Link List];
     H --> C;
 ```
@@ -139,33 +149,3 @@ Distributed under the MIT License. See `LICENSE` for more information.
 -   The design and concept were inspired by the need to streamline the process of expanding a personal knowledge base.
 -   Thanks to the Obsidian community for providing an excellent platform and API for plugin development.
 -   This plugin was built with the help of the [Obsidian Sample Plugin](https://github.com/obsidianmd/obsidian-sample-plugin) template.
-
----
-
-### 中文介绍 (Chinese Introduction)
-
-**Knowledge Curator** (知识策展人) 是一个 Obsidian 插件，它作为一个**链接驱动的知识图谱扩展工具**。它会扫描您 Vault 中所有笔记里的 `[[]]` 链接，识别出那些指向尚不存在的文件的“悬空链接”，并以智能排序的方式呈现给您。您只需选择一个悬空链接，插件就会自动为其创建对应的文件，并调用 AI 填充内容，从而帮助您有机地扩展知识网络。
-
-#### 核心理念与工作流
-
-1.  **扫描 (Scan):** 插件启动或用户手动刷新时，遍历 Vault 中所有 `.md` 文件，解析出每一个 `[[]]` 链接。
-2.  **识别 (Identify):** 对于每一个解析出的链接，利用 Obsidian 的 API 检查其是否指向一个已存在的文件。所有指向不存在文件的链接都被识别为“悬空链接”。
-3.  **聚合与排序 (Aggregate & Sort):**
-    -   对所有悬空链接进行聚合统计。
-    -   按照用户选择的排序逻辑进行排序：
-        -   **按频次 (Frequency):** 被引用次数最多的悬空链接排在最前。
-        -   **按字母顺序 (Alphabetical):** 从 A 到 Z 排序。
-4.  **展示 (Display):** 在专属的侧边栏中，以一个清晰的列表（或按文件夹分组的列表）展示所有排序后的悬空链接。
-5.  **选择与创建 (Select & Create):** 用户在列表中选择一个或多个悬空链接。插件会立即以该链接的名称为标题，在用户指定的默认位置创建一个新的 `.md` 文件。
-6.  **填充 (Populate):** 以该标题为关键词，使用预设模板调用 OpenAI-compatible 接口，生成内容并填充到新创建的文件中。如果启用了上下文感知生成，还会收集引用了该链接的其他笔记的上下文。
-7.  **刷新 (Refresh):** 操作完成后，侧边栏列表自动刷新，刚刚被处理的链接从“悬空链接”列表中消失。
-
-#### 主要功能
-
--   **悬空链接浏览器**: 在侧边栏中清晰展示所有悬空链接，并可查看其来源文件。
--   **一键定义链接**: 选择链接后，一键即可创建笔记并生成内容，无需确认。
--   **上下文感知生成**: 可选功能，能收集引用链接的笔记上下文，使 AI 生成的内容更贴合您的知识网络。
--   **模板驱动**: 支持自定义模板，使用 `{{title}}` 和 `{{context_snippets}}` 占位符。
--   **多语言界面**: 支持中英文界面切换。
--   **批量操作**: 支持全选/取消全选，并可批量生成多个笔记。
--   **强大的排序与分组**: 可按频次、字母排序，并可按文件夹分组。

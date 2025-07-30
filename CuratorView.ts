@@ -692,16 +692,8 @@ export class CuratorView extends ItemView {
 			t(lang, "noticeGeneratingFor", { title: linkInfo.linkText })
 		);
 
-		let contextSnippets: string | undefined;
-		if (this.plugin.settings.enableContextAwareGeneration) {
-			contextSnippets = await this.generator.getContextSnippets(
-				linkInfo.linkText
-			);
-		}
-
 		const generatedContent = await this.generator.generateForNoteTitle(
 			linkInfo.linkText,
-			contextSnippets,
 			this.selectedPrompt // Pass the selected prompt
 		);
 
