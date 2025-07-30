@@ -19,7 +19,7 @@ export class CuratorView extends ItemView {
 	contentEl: HTMLElement; // Main content area for the list
 	links: UnresolvedLinkInfo[] = [];
 	availableTemplates: { name: string; path: string }[] = [];
-	selectedTemplatePath = "";
+	selectedPrompt = "";
 	currentSortBy: "frequency" | "alphabetical" = "frequency";
 	currentGroupBy: "none" | "folder" = "folder"; // Default to folder view
 	searchQuery = "";
@@ -58,7 +58,7 @@ export class CuratorView extends ItemView {
 			this.availableTemplates =
 				await this.generator.getAvailableTemplates();
 			if (this.availableTemplates.length > 0) {
-				this.selectedTemplatePath = this.availableTemplates[0].path; // Select first by default
+				this.selectedPrompt = this.availableTemplates[0].path; // Select first by default
 			}
 			this.renderTemplateDropdown();
 		} catch (error) {
@@ -97,11 +97,9 @@ export class CuratorView extends ItemView {
 					new Option(template.name, template.path)
 				);
 			});
-			templateDropdown.value = this.selectedTemplatePath;
+			templateDropdown.value = this.selectedPrompt;
 			templateDropdown.addEventListener("change", (e) => {
-				this.selectedTemplatePath = (
-					e.target as HTMLSelectElement
-				).value;
+				this.selectedPrompt = (e.target as HTMLSelectElement).value;
 			});
 		}
 		templateLabel.appendChild(templateDropdown);
@@ -558,14 +556,14 @@ export class CuratorView extends ItemView {
 			new Notice(t(lang, "noticeNoLinksSelected"));
 			return;
 		}
-		if (!this.selectedTemplatePath) {
+		if (!this.selectedPrompt) {
 			new Notice(t(lang, "noticeNoTemplateSelected"));
 			return;
 		}
 
 		const selectedLinkTexts = Array.from(this.state.selectedLinks);
 		const templateName = this.availableTemplates.find(
-			(t) => t.path === this.selectedTemplatePath
+			(t) => t.path === this.selectedPrompt
 		)?.name;
 		new Notice(
 			t(lang, "noticeStartingGeneration", {
@@ -628,7 +626,7 @@ export class CuratorView extends ItemView {
 		const generatedContent = await this.generator.generateForNoteTitle(
 			linkInfo.linkText,
 			contextSnippets,
-			this.selectedTemplatePath // Pass the selected template path
+			this.selectedPrompt // Pass the selected prompt
 		);
 
 		const targetDir = newNotePath.substring(

@@ -1,4 +1,4 @@
-import { App, TFile, TFolder } from "obsidian";
+import { App } from "obsidian";
 import KnowledgeCurator from "./main";
 import { ApiService } from "./ApiService";
 
@@ -62,83 +62,46 @@ export class GeneratorService {
 	}
 
 	/**
-	 * Gets a list of available template files from the configured template folder.
-	 * @returns A promise that resolves to an array of objects, each containing the template's name and path.
+	 * Gets a list of available prompt templates from the plugin settings.
+	 * @returns A promise that resolves to an array of objects, each containing the template's name and prompt.
 	 */
 	async getAvailableTemplates(): Promise<{ name: string; path: string }[]> {
-		const { templateFolderPath } = this.plugin.settings;
-		const templates: { name: string; path: string }[] = [];
-
-		if (!templateFolderPath) {
-			return []; // Return empty if no folder is configured
-		}
-
-		const folder = this.app.vault.getAbstractFileByPath(templateFolderPath);
-		if (!(folder instanceof TFolder)) {
-			// If it's not a folder or doesn't exist, return empty.
-			// Optionally, show a notice or log a warning.
-			console.warn(
-				`Template folder not found or is not a folder: ${templateFolderPath}`
-			);
-			return [];
-		}
-
-		const children = folder.children;
-		for (const child of children) {
-			if (child instanceof TFile && child.extension === "md") {
-				templates.push({
-					name: child.basename,
-					path: child.path,
-				});
-			}
-		}
-		// Sort templates alphabetically by name
-		templates.sort((a, b) => a.name.localeCompare(b.name));
-		return templates;
+		const { promptTemplates } = this.plugin.settings;
+		// Map to the expected structure { name: string; path: string }
+		// We use the prompt itself as the 'path' for identification in the dropdown.
+		return promptTemplates.map((t) => ({
+			name: t.name,
+			path: t.prompt, // Using prompt as a unique identifier for selection
+		}));
 	}
 
 	/**
-	 * Generates content for a new note based on a title, optional context snippets, and a selected template path.
+	 * Generates content for a new note based on a title, optional context snippets, and a selected prompt template.
 	 * @param title The title of the new note.
 	 * @param contextSnippets Optional string containing context snippets.
-	 * @param templatePath The path to the selected template file.
+	 * @param selectedPrompt The prompt string from the selected template.
 	 * @returns A promise that resolves to the generated content string.
 	 */
 	async generateForNoteTitle(
 		title: string,
 		contextSnippets: string | undefined,
-		templatePath: string
+		selectedPrompt: string
 	): Promise<string> {
-		if (!templatePath) {
+		if (!selectedPrompt) {
 			throw new Error(
-				"Template path is not provided. Please select a template."
+				"Prompt template is not provided. Please select a template."
 			);
 		}
 
-		const templateFile = this.app.vault.getAbstractFileByPath(templatePath);
-
-		if (!(templateFile instanceof TFile)) {
-			throw new Error(
-				`Template file not found at "${templatePath}". Please check the template selection.`
-			);
-		}
-
-		let templateContent: string;
-		try {
-			templateContent = await this.app.vault.read(templateFile);
-		} catch (error) {
-			console.error("Error reading template file:", error);
-			throw new Error(`Could not read template file: ${templatePath}`);
-		}
-
-		// Replace placeholders
-		let prompt = templateContent.replace(/{{title}}/g, title);
+		// Replace placeholders in the selected prompt
+		const prompt = selectedPrompt.replace(/{{title}}/g, title);
 
 		if (contextSnippets) {
-			prompt = prompt.replace(/{{context_snippets}}/g, contextSnippets);
-		} else {
-			// If no context snippets, remove the placeholder or replace with empty string
-			prompt = prompt.replace(/{{context_snippets}}/g, "");
+			// Note: The {{context_snippets}} placeholder is not used in the new prompt system
+			// as per the user's feedback. Context is handled separately if enabled.
+			// If we wanted to re-integrate it, we would add a placeholder like {{context}}
+			// to the prompt templates and replace it here.
+			// For now, we just ignore the contextSnippets parameter if it's passed.
 		}
 
 		try {

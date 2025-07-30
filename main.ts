@@ -8,11 +8,16 @@ import {
 } from "obsidian";
 import { CuratorView, VIEW_TYPE_CURATOR } from "./CuratorView";
 
+interface PromptTemplate {
+	name: string;
+	prompt: string;
+}
+
 interface KnowledgeCuratorSettings {
 	apiEndpoint: string;
 	apiKey: string;
 	modelName: string;
-	templateFolderPath: string; // Changed from file path to folder path
+	promptTemplates: PromptTemplate[]; // New prompt-based template system
 	defaultNewNotePath: string;
 	enableContextAwareGeneration: boolean;
 	language: "en" | "zh"; // New setting for language
@@ -22,7 +27,12 @@ const DEFAULT_SETTINGS: KnowledgeCuratorSettings = {
 	apiEndpoint: "",
 	apiKey: "",
 	modelName: "gpt-3.5-turbo",
-	templateFolderPath: "Templates", // Changed to folder path
+	promptTemplates: [
+		{
+			name: "Default Summary",
+			prompt: "Please provide a comprehensive summary of the topic: {{title}}.",
+		},
+	], // Default to a simple prompt template
 	defaultNewNotePath: "", // Default to root of vault
 	enableContextAwareGeneration: true, // Default to enabled
 	language: "en", // Default to English
@@ -195,20 +205,99 @@ class KnowledgeCuratorSettingTab extends PluginSettingTab {
 					})
 			);
 
-		new Setting(containerEl)
-			.setName("Template Folder Path")
-			.setDesc(
-				"Path to the folder containing your template files (e.g., Templates). Templates should be markdown files and can use {{title}} and {{context_snippets}} as placeholders."
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("Templates")
-					.setValue(this.plugin.settings.templateFolderPath)
-					.onChange(async (value) => {
-						this.plugin.settings.templateFolderPath = value;
-						await this.plugin.saveSettings();
-					})
-			);
+		// Prompt Templates Management
+		containerEl.createEl("h3", { text: "Prompt Templates" });
+		containerEl.createEl("p", {
+			text: "Define and manage your prompt templates for AI generation. Use {{title}} as a placeholder for the link name.",
+			cls: "setting-item-description",
+		});
+
+		const templatesContainer = containerEl.createDiv(
+			"prompt-templates-container"
+		);
+
+		const renderTemplates = () => {
+			templatesContainer.empty();
+			this.plugin.settings.promptTemplates.forEach((template, index) => {
+				const templateSetting = new Setting(templatesContainer)
+					.setName(`Template ${index + 1}: ${template.name}`)
+					.setDesc(template.prompt)
+					.setClass("prompt-template-item");
+
+				templateSetting.addExtraButton((button) => {
+					button
+						.setIcon("pencil")
+						.setTooltip("Edit")
+						.onClick(() => {
+							// Simple prompt for edit
+							const newName = prompt(
+								"Edit template name:",
+								template.name
+							);
+							if (newName === null) return; // User cancelled
+							const newPrompt = prompt(
+								"Edit template prompt:",
+								template.prompt
+							);
+							if (newPrompt === null) return; // User cancelled
+
+							this.plugin.settings.promptTemplates[index] = {
+								name: newName,
+								prompt: newPrompt,
+							};
+							this.plugin.saveSettings();
+							renderTemplates(); // Re-render
+						});
+				});
+
+				templateSetting.addExtraButton((button) => {
+					button
+						.setIcon("trash")
+						.setTooltip("Delete")
+						.onClick(() => {
+							if (
+								confirm(
+									`Are you sure you want to delete the template "${template.name}"?`
+								)
+							) {
+								this.plugin.settings.promptTemplates.splice(
+									index,
+									1
+								);
+								this.plugin.saveSettings();
+								renderTemplates(); // Re-render
+							}
+						});
+				});
+			});
+		};
+
+		new Setting(templatesContainer)
+			.setName("Add new template")
+			.setDesc("Create a new prompt template.")
+			.addButton((btn) => {
+				btn.setButtonText("Add")
+					.setCta()
+					.onClick(() => {
+						const name = window.prompt(
+							"Enter a name for the new template:"
+						);
+						if (!name) return;
+						const promptText = window.prompt(
+							"Enter the prompt for the new template (use {{title}} as a placeholder):"
+						);
+						if (!promptText) return;
+
+						this.plugin.settings.promptTemplates.push({
+							name,
+							prompt: promptText,
+						});
+						this.plugin.saveSettings();
+						renderTemplates();
+					});
+			});
+
+		renderTemplates(); // Initial render
 
 		new Setting(containerEl)
 			.setName("Default Folder for New Notes")
