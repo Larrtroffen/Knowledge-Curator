@@ -46,34 +46,6 @@
 
 本插件采用模块化设计，主要包含以下几个核心部分：
 
-```mermaid
-graph TD
-    subgraph Obsidian Plugin: Knowledge Curator
-        A[UI: Curator Sidebar] -- 用户点击笔记 --> B{主控制器 (main.ts)};
-        C[命令: 刷新列表] -- 用户操作 --> B;
-        D[设置页面] -- 配置数据 --> B;
-
-        B -- 触发扫描 --> E[Vault 扫描器 (VaultScanner.ts)];
-        E -- 扫描所有 .md 文件并读取 frontmatter --> F[Obsidian Vault API];
-        E -- 构建列表数据结构 --> B;
-        B -- 渲染列表 --> A;
-
-        B -- 响应笔记点击 (标题, 模板) --> G[内容生成器 (GeneratorService.ts)];
-        G -- 格式化 Prompt --> H[API 调用服务 (ApiService.ts)];
-        H -- 发送请求 (端点, 密钥, 模型, Prompt) --> I[外部: LLM 端点];
-        I -- 返回 Markdown 内容 --> H;
-        H -- 返回内容至 --> G;
-        G -- 返回内容至 --> B;
-
-        B -- 写入内容并更新 frontmatter --> F;
-        B -- 请求刷新列表或更新单个节点 --> E;
-    end
-
-    style A fill:#cde, stroke:#333
-    style E fill:#cde, stroke:#333
-    style G fill:#cde, stroke:#333
-```
-
 -   **`main.ts`**: 插件的入口点。负责注册侧边栏视图、命令（如打开视图、刷新扫描）和设置页面。是插件生命周期管理的核心。
 -   **`CuratorView.ts`**: 侧边栏 UI 的核心。负责渲染笔记列表、处理用户点击事件、调用内容生成服务，并更新笔记文件和其 Frontmatter。它直接与用户交互。
 -   **`VaultScanner.ts`**: 负责遍历 Vault，通过 `app.metadataCache` 读取每个 Markdown 文件的 Frontmatter，判断其状态（待填充、已完成等），并构建一个供 UI 渲染的数据结构。
