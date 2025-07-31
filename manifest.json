@@ -2,7 +2,7 @@
 	"id": "knowledge-curator",
 	"name": "Knowledge Curator",
 	"version": "1.0.0",
-	"minAppVersion": "0.15.0",
+	"minAppVersion": "1.0.0",
 	"description": "A link-driven knowledge graph extension tool. It scans for unresolved links, allows you to define them with AI-generated content, and helps grow your knowledge network organically.",
 	"author": "Larrtroffen",
 	"authorUrl": "https://github.com/Larrtroffen",
